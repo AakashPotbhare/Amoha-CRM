@@ -1,0 +1,20 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Amoha Pathfinder Frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 8080,
+      "autoPort": false,
+      "cwd": "D:/Desktop/Amoha Pathfinder/frontend"
+    },
+    {
+      "name": "Amoha Pathfinder Backend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["start"],
+      "port": 4000,
+      "cwd": "D:/Desktop/Amoha Pathfinder/backend"
+    }
+  ]
+}

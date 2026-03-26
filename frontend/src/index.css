@@ -1,0 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 25% 95%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 172 66% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 16% 92%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 220 16% 92%;
+    --muted-foreground: 220 10% 42%;
+
+    --accent: 172 50% 92%;
+    --accent-foreground: 172 66% 26%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 16% 86%;
+    --input: 220 16% 86%;
+    --ring: 172 66% 36%;
+
+    --radius: 0.625rem;
+
+    --sidebar-bg: 222 47% 11%;
+    --sidebar-fg: 220 14% 70%;
+    --sidebar-fg-active: 0 0% 100%;
+    --sidebar-accent: 222 30% 18%;
+    --sidebar-border: 222 30% 18%;
+
+    --success: 152 60% 38%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 210 100% 50%;
+    --info-foreground: 0 0% 100%;
+
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --shadow-card: 0 1px 3px 0 hsl(222 47% 11% / 0.06), 0 1px 2px -1px hsl(222 47% 11% / 0.06);
+    --shadow-card-hover: 0 4px 12px -2px hsl(222 47% 11% / 0.1), 0 2px 6px -2px hsl(222 47% 11% / 0.06);
+  }
+
+  .dark {
+    --background: 222 47% 8%;
+    --foreground: 220 20% 90%;
+
+    --card: 222 40% 12%;
+    --card-foreground: 220 20% 90%;
+
+    --popover: 222 40% 12%;
+    --popover-foreground: 220 20% 90%;
+
+    --primary: 172 66% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 30% 18%;
+    --secondary-foreground: 220 20% 90%;
+
+    --muted: 222 30% 18%;
+    --muted-foreground: 220 14% 55%;
+
+    --accent: 172 40% 16%;
+    --accent-foreground: 172 66% 60%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 30% 20%;
+    --input: 222 30% 20%;
+    --ring: 172 66% 42%;
+
+    --sidebar-bg: 222 50% 6%;
+    --sidebar-fg: 220 14% 55%;
+    --sidebar-fg-active: 0 0% 100%;
+    --sidebar-accent: 222 40% 14%;
+    --sidebar-border: 222 40% 14%;
+
+    --success: 152 60% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 210 100% 55%;
+    --info-foreground: 0 0% 100%;
+
+    --shadow-card: 0 1px 3px 0 hsl(0 0% 0% / 0.2), 0 1px 2px -1px hsl(0 0% 0% / 0.2);
+    --shadow-card-hover: 0 4px 12px -2px hsl(0 0% 0% / 0.3), 0 2px 6px -2px hsl(0 0% 0% / 0.2);
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  html, body {
+    overflow: hidden;
+    height: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer utilities {
+  .card-elevated {
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.2s ease;
+  }
+  .card-elevated:hover {
+    box-shadow: var(--shadow-card-hover);
+  }
+}
