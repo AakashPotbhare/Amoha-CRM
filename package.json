@@ -1,0 +1,20 @@
+{
+  "name": "recruithub",
+  "version": "1.0.0",
+  "description": "RecruitHUB — Amoha Recruitment Services (monorepo root)",
+  "private": true,
+  "scripts": {
+    "test:backend":           "cd \"Amoha Pathfinder/backend\" && npm test",
+    "test:backend:unit":      "cd \"Amoha Pathfinder/backend\" && npm run test:unit",
+    "test:backend:integration": "cd \"Amoha Pathfinder/backend\" && npm run test:integration",
+    "test:backend:coverage":  "cd \"Amoha Pathfinder/backend\" && npm run test:coverage",
+    "test:frontend":          "cd \"Amoha Pathfinder/frontend\" && npm test -- --run",
+    "test:frontend:coverage": "cd \"Amoha Pathfinder/frontend\" && npm test -- --run --coverage",
+    "test:e2e":               "cd \"Amoha Pathfinder/e2e\" && npm test",
+    "test:e2e:headed":        "cd \"Amoha Pathfinder/e2e\" && npm run test:headed",
+    "test:e2e:ui":            "cd \"Amoha Pathfinder/e2e\" && npm run test:ui",
+    "test:e2e:report":        "cd \"Amoha Pathfinder/e2e\" && npm run test:report",
+    "test:all":               "npm run test:backend && npm run test:frontend",
+    "install:all":            "cd \"Amoha Pathfinder/backend\" && npm ci && cd ../frontend && npm ci && cd ../e2e && npm ci"
+  }
+}

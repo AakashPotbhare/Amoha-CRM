@@ -1,0 +1,20 @@
+{
+  "name": "recruithub-e2e",
+  "version": "1.0.0",
+  "description": "Playwright end-to-end tests for the RecruitHUB application",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:debug": "playwright test --debug",
+    "test:auth": "playwright test tests/auth.spec.ts",
+    "test:navigation": "playwright test tests/navigation.spec.ts",
+    "test:candidates": "playwright test tests/candidates.spec.ts",
+    "test:attendance": "playwright test tests/attendance.spec.ts",
+    "test:leaves": "playwright test tests/leaves.spec.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0"
+  }
+}

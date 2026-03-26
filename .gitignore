@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+*/node_modules/
+**/node_modules/
+
+# Environment files — NEVER commit these
+.env
+.env.local
+.env.production
+**/.env
+**/.env.local
+**/.env.production
+
+# Build outputs
+dist/
+build/
+frontend/dist/
+frontend/build/
+
+# Uploads (user-generated files)
+backend/uploads/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Coverage reports
+coverage/
+frontend/coverage/
+backend/coverage/
+e2e/playwright-report/
+e2e/test-results/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Temp files
+D:temp_token.json

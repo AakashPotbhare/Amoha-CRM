@@ -1,0 +1,862 @@
+{
+  "info": {
+    "name": "RecruitHUB — Full E2E Test Suite",
+    "description": "Complete end-to-end test suite for the RecruitHUB backend API. Covers all 11 route groups with assertions.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl",           "value": "http://localhost:4000" },
+    { "key": "token",             "value": "" },
+    { "key": "candidateId",       "value": "c8cb5843-4f7c-43a2-9a50-0d9dd3e9818a" },
+    { "key": "supportTaskId",     "value": "05328e36-4bc4-4827-8cce-968e9a68d390" },
+    { "key": "employeeId",        "value": "49609c3b-24c8-11f1-a0d5-00e04caa2d27" },
+    { "key": "techEmployeeId",    "value": "4960b603-24c8-11f1-a0d5-00e04caa2d27" },
+    { "key": "placementOfferId",  "value": "17c710c0-e0b2-42c9-82b7-0d98329024a9" },
+    { "key": "newTaskId",         "value": "" },
+    { "key": "newCandidateId",    "value": "" },
+    { "key": "newSupportTaskId",  "value": "" },
+    { "key": "newPOId",           "value": "" }
+  ],
+  "item": [
+
+    {
+      "name": "🔐 [Auth] Login as Director",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Login returns 200', () => pm.response.to.have.status(200));",
+          "pm.test('Token returned', () => {",
+          "  const json = pm.response.json();",
+          "  pm.expect(json.success).to.be.true;",
+          "  pm.expect(json.data.token).to.be.a('string').and.have.length.above(20);",
+          "  pm.collectionVariables.set('token', json.data.token);",
+          "  console.log('✅ Token captured');",
+          "});"
+        ]}
+      }],
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/auth/login",
+        "body": { "mode": "raw", "raw": "{\"employeeCode\":\"DIR001\",\"password\":\"Amoha@2026\"}" }
+      }
+    },
+
+    {
+      "name": "🔐 [Auth] GET /me",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns director profile', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d.role).to.equal('director');",
+          "  pm.expect(d).to.have.property('employee_code');",
+          "  console.log('Logged in as:', d.full_name, '|', d.role);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/me" }
+    },
+
+    {
+      "name": "👥 [Employees] GET all active",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns non-empty employee array', () => {",
+          "  const json = pm.response.json();",
+          "  pm.expect(json.success).to.be.true;",
+          "  pm.expect(json.data).to.be.an('array').with.length.above(0);",
+          "  console.log('Active employees:', json.data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/employees?is_active=true" }
+    },
+
+    {
+      "name": "👥 [Employees] GET departments",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns departments', () => {",
+          "  const data = pm.response.json().data;",
+          "  pm.expect(data).to.be.an('array').with.length.above(0);",
+          "  console.log('Departments:', data.map(d=>d.name).join(', '));",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/employees/departments" }
+    },
+
+    {
+      "name": "👥 [Employees] GET teams",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns teams array', () => {",
+          "  pm.expect(pm.response.json().data).to.be.an('array');",
+          "  console.log('Teams:', pm.response.json().data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/employees/teams" }
+    },
+
+    {
+      "name": "👥 [Employees] GET by ID",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns employee detail', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('id');",
+          "  pm.expect(d).to.have.property('full_name');",
+          "  console.log('Employee:', d.full_name, '|', d.role);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/employees/{{employeeId}}" }
+    },
+
+    {
+      "name": "👥 [Employees] PATCH update designation",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Update succeeds', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  console.log('Updated:', pm.response.json().data?.designation);",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/employees/{{techEmployeeId}}",
+        "body": { "mode": "raw", "raw": "{\"designation\":\"Senior Technical Executive\"}" }
+      }
+    },
+
+    {
+      "name": "🎯 [Candidates] GET list",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns candidates', () => {",
+          "  const json = pm.response.json();",
+          "  pm.expect(json.success).to.be.true;",
+          "  pm.expect(json.data).to.be.an('array');",
+          "  console.log('Candidates:', json.data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/candidates?limit=20" }
+    },
+
+    {
+      "name": "🎯 [Candidates] GET pipeline-stats",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns pipeline stats', () => {",
+          "  const json = pm.response.json();",
+          "  pm.expect(json.success).to.be.true;",
+          "  console.log('Pipeline stats:', JSON.stringify(json.data));",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/candidates/pipeline-stats" }
+    },
+
+    {
+      "name": "🎯 [Candidates] GET by ID",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns candidate', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('full_name');",
+          "  pm.expect(d).to.have.property('pipeline_stage');",
+          "  console.log('Candidate:', d.full_name, '| Stage:', d.pipeline_stage);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/candidates/{{candidateId}}" }
+    },
+
+    {
+      "name": "🎯 [Candidates] POST enroll new",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 201', () => pm.response.to.have.status(201));",
+          "pm.test('Candidate enrolled', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('id');",
+          "  pm.collectionVariables.set('newCandidateId', d.id);",
+          "  console.log('Enrolled ID:', d.id);",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/candidates",
+        "body": { "mode": "raw", "raw": "{\"full_name\":\"Postman Test Candidate\",\"email\":\"postman.test.e2e@example.com\",\"phone\":\"9876543210\"}" }
+      }
+    },
+
+    {
+      "name": "🎯 [Candidates] PATCH update stage",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Stage updated', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  console.log('New stage:', pm.response.json().data?.pipeline_stage);",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/candidates/{{candidateId}}/stage",
+        "body": { "mode": "raw", "raw": "{\"stage\":\"placed\"}" }
+      }
+    },
+
+    {
+      "name": "✅ [Tasks] GET list",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns tasks array', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  pm.expect(pm.response.json().data).to.be.an('array');",
+          "  console.log('Tasks:', pm.response.json().data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks" }
+    },
+
+    {
+      "name": "✅ [Tasks] POST create",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 201', () => pm.response.to.have.status(201));",
+          "pm.test('Task created', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('id');",
+          "  pm.collectionVariables.set('newTaskId', d.id);",
+          "  console.log('Task ID:', d.id, '| Title:', d.title);",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/tasks",
+        "body": { "mode": "raw", "raw": "{\"title\":\"Postman E2E Test Task\",\"description\":\"Created by the automated test suite\",\"assigned_to_employee_id\":\"{{techEmployeeId}}\",\"priority\":\"medium\"}" }
+      }
+    },
+
+    {
+      "name": "✅ [Tasks] PATCH update status",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Status updated', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  console.log('Task status:', pm.response.json().data?.status);",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/tasks/{{newTaskId}}/status",
+        "body": { "mode": "raw", "raw": "{\"status\":\"in_progress\"}" }
+      }
+    },
+
+    {
+      "name": "🎧 [Support Tasks] GET list",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns support tasks', () => {",
+          "  const json = pm.response.json();",
+          "  pm.expect(json.success).to.be.true;",
+          "  pm.expect(json.data).to.be.an('array');",
+          "  console.log('Support tasks:', json.data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/support-tasks?limit=20" }
+    },
+
+    {
+      "name": "🎧 [Support Tasks] GET by ID",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns support task detail', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('task_type');",
+          "  console.log('Type:', d.task_type, '| Status:', d.status, '| Call:', d.call_status || 'N/A');",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/support-tasks/{{supportTaskId}}" }
+    },
+
+    {
+      "name": "🎧 [Support Tasks] POST create",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 201', () => pm.response.to.have.status(201));",
+          "pm.test('Support task created', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('id');",
+          "  pm.collectionVariables.set('newSupportTaskId', d.id);",
+          "  console.log('New support task ID:', d.id);",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/support-tasks",
+        "body": { "mode": "raw", "raw": "{\"task_type\":\"mock_call\",\"candidate_name\":\"Postman Test Candidate\",\"candidate_technology\":\"Java\",\"priority\":\"medium\",\"assigned_to_employee_id\":\"{{techEmployeeId}}\"}" }
+      }
+    },
+
+    {
+      "name": "🎧 [Support Tasks] PATCH call-status",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Call status updated', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  console.log('Call status:', pm.response.json().data?.call_status);",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/support-tasks/{{supportTaskId}}/call-status",
+        "body": { "mode": "raw", "raw": "{\"call_status\":\"completed\",\"feedback\":\"Candidate performed extremely well on the mock call. Ready for real interviews.\"}" }
+      }
+    },
+
+    {
+      "name": "🎧 [Support Tasks] POST add comment",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200 or 201', () => pm.expect(pm.response.code).to.be.oneOf([200, 201]));",
+          "pm.test('Comment added', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  console.log('Comment response:', JSON.stringify(pm.response.json().data));",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/support-tasks/{{supportTaskId}}/comments",
+        "body": { "mode": "raw", "raw": "{\"content\":\"Postman E2E test comment — everything looks good.\"}" }
+      }
+    },
+
+    {
+      "name": "📊 [Attendance] GET today",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns today status', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  console.log('Today attendance:', pm.response.json().data?.status || 'no record');",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/attendance/today" }
+    },
+
+    {
+      "name": "📊 [Attendance] POST check-in",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Valid response (200/201/400)', () => pm.expect(pm.response.code).to.be.oneOf([200, 201, 400]));",
+          "const json = pm.response.json();",
+          "console.log('Check-in:', json.success ? '✅ Checked in' : '⚠️ ' + json.error);"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/attendance/check-in",
+        "body": { "mode": "raw", "raw": "{}" }
+      }
+    },
+
+    {
+      "name": "📊 [Attendance] GET monthly",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns monthly records', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  console.log('Monthly records:', pm.response.json().data?.length || 0);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/attendance/monthly" }
+    },
+
+    {
+      "name": "📊 [Attendance] GET report (payroll)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns payroll report', () => {",
+          "  const json = pm.response.json();",
+          "  pm.expect(json.success).to.be.true;",
+          "  console.log('Payroll rows:', Array.isArray(json.data) ? json.data.length : 'object');",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/attendance/report?month=3&year=2026" }
+    },
+
+    {
+      "name": "🏖️ [Leaves] GET list",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns leaves', () => {",
+          "  pm.expect(pm.response.json().data).to.be.an('array');",
+          "  console.log('Leave records:', pm.response.json().data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/leaves" }
+    },
+
+    {
+      "name": "🏖️ [Leaves] POST submit request",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 201', () => pm.response.to.have.status(201));",
+          "pm.test('Leave submitted', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('id');",
+          "  pm.collectionVariables.set('newLeaveId', d.id);",
+          "  console.log('Leave ID:', d.id, '| Status:', d.status);",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/leaves",
+        "body": { "mode": "raw", "raw": "{\"leave_type\":\"casual\",\"from_date\":\"2026-05-10\",\"to_date\":\"2026-05-10\",\"reason\":\"Personal work — Postman E2E test\"}" }
+      }
+    },
+
+    {
+      "name": "🏖️ [Leaves] GET pending-manager",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns pending leaves', () => {",
+          "  pm.expect(pm.response.json().data).to.be.an('array');",
+          "  console.log('Pending (manager):', pm.response.json().data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/leaves/pending-manager" }
+    },
+
+    {
+      "name": "🏥 [HR] GET notices",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns notices', () => {",
+          "  pm.expect(pm.response.json().data).to.be.an('array');",
+          "  console.log('Notices:', pm.response.json().data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/hr/notices" }
+    },
+
+    {
+      "name": "🏥 [HR] POST create notice",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 201', () => pm.response.to.have.status(201));",
+          "pm.test('Notice created', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('id');",
+          "  pm.collectionVariables.set('newNoticeId', d.id);",
+          "  console.log('Notice:', d.title);",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/hr/notices",
+        "body": { "mode": "raw", "raw": "{\"title\":\"Postman E2E Test Notice\",\"content\":\"This notice was automatically created by the Postman E2E test suite for validation purposes.\"}" }
+      }
+    },
+
+    {
+      "name": "🏥 [HR] GET shifts",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns shifts', () => {",
+          "  pm.expect(pm.response.json().data).to.be.an('array');",
+          "  console.log('Shifts:', pm.response.json().data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/hr/shifts" }
+    },
+
+    {
+      "name": "🏥 [HR] GET office-locations",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns locations', () => {",
+          "  pm.expect(pm.response.json().data).to.be.an('array');",
+          "  console.log('Offices:', pm.response.json().data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/hr/office-locations" }
+    },
+
+    {
+      "name": "🏥 [HR] GET leave-balance",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns leave balance', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  console.log('Leave balance:', JSON.stringify(pm.response.json().data));",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/hr/leave-balance/{{employeeId}}" }
+    },
+
+    {
+      "name": "🏥 [HR] GET salary-history",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns salary history', () => {",
+          "  pm.expect(pm.response.json().data).to.be.an('array');",
+          "  console.log('Salary history entries:', pm.response.json().data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/hr/salary-history/{{techEmployeeId}}" }
+    },
+
+    {
+      "name": "🔔 [Notifications] GET list",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns notifications', () => {",
+          "  const json = pm.response.json();",
+          "  pm.expect(json.success).to.be.true;",
+          "  pm.expect(json.data).to.be.an('array');",
+          "  console.log('Notifications:', json.data.length, '| Unread:', json.data.filter(n=>!n.is_read).length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/notifications" }
+    },
+
+    {
+      "name": "🔔 [Notifications] PATCH mark-all-read",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Mark-all-read succeeds', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  console.log('All notifications marked read');",
+          "});"
+        ]}
+      }],
+      "request": { "method": "PATCH", "url": "{{baseUrl}}/api/notifications/read-all" }
+    },
+
+    {
+      "name": "💰 [Placement Offers] GET stats",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns PO stats', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('totals');",
+          "  pm.expect(d).to.have.property('by_team');",
+          "  const t = d.totals;",
+          "  console.log('POs:', t.total_pos, '| Package: ₹' + (t.total_package||0));",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/placement-orders/stats?period=month" }
+    },
+
+    {
+      "name": "💰 [Placement Offers] GET list",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns PO list', () => {",
+          "  pm.expect(pm.response.json().data).to.be.an('array');",
+          "  console.log('Placement offers:', pm.response.json().data.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/placement-orders" }
+    },
+
+    {
+      "name": "💰 [Placement Offers] GET by ID",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Returns single PO', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('candidate_name');",
+          "  console.log('PO:', d.candidate_name, '|', d.employer_name, '| Status:', d.status);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/placement-orders/{{placementOfferId}}" }
+    },
+
+    {
+      "name": "💰 [Placement Offers] POST create",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 201', () => pm.response.to.have.status(201));",
+          "pm.test('PO created', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('id');",
+          "  pm.collectionVariables.set('newPOId', d.id);",
+          "  console.log('PO ID:', d.id, '| Candidate:', d.candidate_name);",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/placement-orders",
+        "body": { "mode": "raw", "raw": "{\"candidate_name\":\"Postman E2E Candidate\",\"technology\":\"Python\",\"offer_position\":\"Data Engineer\",\"employer_name\":\"TechCorp Ltd\",\"employment_type\":\"full_time\",\"offer_date\":\"2026-03-23\",\"annual_package\":1500000,\"commission_rate\":10,\"commission_amount\":150000,\"final_amount_due\":150000,\"upfront_paid\":0}" }
+      }
+    },
+
+    {
+      "name": "💰 [Placement Offers] PATCH update status",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('PO updated', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  console.log('PO status now:', pm.response.json().data?.status);",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/placement-orders/{{placementOfferId}}",
+        "body": { "mode": "raw", "raw": "{\"status\":\"processing\",\"notes\":\"Updated via Postman E2E test suite\"}" }
+      }
+    },
+
+    {
+      "name": "📈 [Analytics] Support tasks — this month",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Analytics shape correct', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('summary');",
+          "  pm.expect(d).to.have.property('by_type');",
+          "  pm.expect(d).to.have.property('by_employee');",
+          "  pm.expect(d).to.have.property('trend');",
+          "  const s = d.summary;",
+          "  console.log(`Tasks: ${s.total} | Done: ${s.completed} | Rate: ${s.completion_rate}% | No-shows: ${s.no_show}`);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/analytics/support-tasks?period=month" }
+    },
+
+    {
+      "name": "📈 [Analytics] Support tasks — today",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Today analytics valid', () => {",
+          "  pm.expect(pm.response.json().data.summary).to.have.property('total');",
+          "  console.log('Today total tasks:', pm.response.json().data.summary.total);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/analytics/support-tasks?period=today" }
+    },
+
+    {
+      "name": "📈 [Analytics] Candidate history",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Candidate history shape', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('enrollment');",
+          "  pm.expect(d).to.have.property('history');",
+          "  pm.expect(d.history).to.be.an('array');",
+          "  console.log(`${d.enrollment.full_name} has ${d.history.length} interview task(s)`);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/analytics/candidate/{{candidateId}}/history" }
+    },
+
+    {
+      "name": "📈 [Analytics] Employee performance",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Performance shape correct', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('employee');",
+          "  pm.expect(d).to.have.property('summary');",
+          "  pm.expect(d).to.have.property('by_type');",
+          "  pm.expect(d).to.have.property('weekly_trend');",
+          "  const s = d.summary;",
+          "  console.log(`${d.employee.full_name}: ${s.total} tasks, ${s.completion_rate}% rate`);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/analytics/employee/{{techEmployeeId}}/performance?period=month" }
+    },
+
+    {
+      "name": "📈 [Analytics] Department summary (technical)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Dept summary shape correct', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('department');",
+          "  pm.expect(d).to.have.property('summary');",
+          "  pm.expect(d).to.have.property('employees');",
+          "  console.log(`${d.department.name}: ${d.summary.employee_count} staff, ${d.summary.total} tasks this month`);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/analytics/departments/technical/summary?period=month" }
+    },
+
+    {
+      "name": "📈 [Analytics] Placement order analytics",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('PO analytics shape', () => {",
+          "  const d = pm.response.json().data;",
+          "  pm.expect(d).to.have.property('totals');",
+          "  pm.expect(d).to.have.property('by_team');",
+          "  console.log('PO analytics: Total offers:', d.totals.total_pos, '| By teams:', d.by_team.length);",
+          "});"
+        ]}
+      }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/analytics/placement-orders?period=month" }
+    },
+
+    {
+      "name": "🔐 [Auth] Change password (then reset)",
+      "event": [{
+        "listen": "test",
+        "script": { "type": "text/javascript", "exec": [
+          "pm.test('Status 200', () => pm.response.to.have.status(200));",
+          "pm.test('Password changed', () => {",
+          "  pm.expect(pm.response.json().success).to.be.true;",
+          "  console.log('Password change response:', pm.response.json().message || 'OK');",
+          "});"
+        ]}
+      }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/auth/change-password",
+        "body": { "mode": "raw", "raw": "{\"currentPassword\":\"Amoha@2026\",\"newPassword\":\"Amoha@2026\"}" }
+      }
+    }
+
+  ]
+}

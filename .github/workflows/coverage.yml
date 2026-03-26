@@ -1,0 +1,179 @@
+name: Coverage Report
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  # Allow manual trigger
+  workflow_dispatch:
+
+concurrency:
+  group: coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  coverage:
+    name: Generate Coverage & Comment PR
+    runs-on: ubuntu-latest
+
+    # Only run on PRs so we can post a comment; skip for push events
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Full history lets the coverage differ from base branch
+          fetch-depth: 0
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # ── Backend coverage ──────────────────────────────────────────────────
+      - name: Install backend dependencies
+        working-directory: Amoha Pathfinder/backend
+        run: npm ci
+
+      - name: Collect backend coverage
+        working-directory: Amoha Pathfinder/backend
+        run: npm run test:coverage -- --ci --forceExit
+        env:
+          NODE_ENV: test
+          JWT_SECRET: ci-coverage-secret
+          JWT_EXPIRES_IN: 1h
+          DB_HOST: 127.0.0.1
+          DB_PORT: '3306'
+          DB_USER: ci_user
+          DB_PASSWORD: ci_password
+          DB_NAME: recruithub_test
+
+      - name: Extract backend coverage summary
+        id: backend_coverage
+        working-directory: Amoha Pathfinder/backend
+        run: |
+          # Parse the clover XML or use the text report from Jest's stdout
+          if [ -f coverage/coverage-summary.json ]; then
+            LINES=$(node -e "
+              const s = require('./coverage/coverage-summary.json').total;
+              console.log([
+                'Lines: '      + s.lines.pct      + '%',
+                'Statements: ' + s.statements.pct + '%',
+                'Functions: '  + s.functions.pct  + '%',
+                'Branches: '   + s.branches.pct   + '%',
+              ].join(' | '));
+            ")
+            echo "summary=${LINES}" >> "$GITHUB_OUTPUT"
+          else
+            echo "summary=Coverage summary not available" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Frontend coverage ─────────────────────────────────────────────────
+      - name: Install frontend dependencies
+        working-directory: Amoha Pathfinder/frontend
+        run: npm ci
+
+      - name: Collect frontend coverage (Vitest)
+        working-directory: Amoha Pathfinder/frontend
+        run: npm run test -- --run --coverage
+        env:
+          NODE_ENV: test
+          VITE_API_BASE_URL: http://localhost:4000
+
+      - name: Extract frontend coverage summary
+        id: frontend_coverage
+        working-directory: Amoha Pathfinder/frontend
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            LINES=$(node -e "
+              const s = require('./coverage/coverage-summary.json').total;
+              console.log([
+                'Lines: '      + s.lines.pct      + '%',
+                'Statements: ' + s.statements.pct + '%',
+                'Functions: '  + s.functions.pct  + '%',
+                'Branches: '   + s.branches.pct   + '%',
+              ].join(' | '));
+            ")
+            echo "summary=${LINES}" >> "$GITHUB_OUTPUT"
+          else
+            echo "summary=Coverage summary not available" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Upload artefacts ──────────────────────────────────────────────────
+      - name: Upload backend coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: Amoha Pathfinder/backend/coverage/
+          retention-days: 30
+
+      - name: Upload frontend coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage-report
+          path: Amoha Pathfinder/frontend/coverage/
+          retention-days: 30
+
+      # ── Comment on PR ─────────────────────────────────────────────────────
+      - name: Comment coverage summary on PR
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const backendSummary  = '${{ steps.backend_coverage.outputs.summary }}';
+            const frontendSummary = '${{ steps.frontend_coverage.outputs.summary }}';
+
+            const body = [
+              '## Coverage Report',
+              '',
+              '| Layer | Lines | Statements | Functions | Branches | Target |',
+              '|---|---|---|---|---|---|',
+              `| **Backend (Jest)**      | See details | — | — | — | >90% unit / >80% integration |`,
+              `| **Frontend (Vitest)**   | See details | — | — | — | >85% |`,
+              '',
+              '### Backend',
+              '```',
+              backendSummary,
+              '```',
+              '',
+              '### Frontend',
+              '```',
+              frontendSummary,
+              '```',
+              '',
+              '> Full HTML reports are attached as workflow artefacts.',
+              '',
+              `_Generated by [Coverage workflow](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})_`,
+            ].join('\n');
+
+            // Find and update an existing comment, or create a new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(
+              (c) => c.user.login === 'github-actions[bot]' && c.body.startsWith('## Coverage Report')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
