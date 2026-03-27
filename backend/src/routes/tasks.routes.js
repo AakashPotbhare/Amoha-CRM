@@ -9,5 +9,6 @@ router.get('/:id',           c.getOne);
 router.post('/',             c.create);
 router.patch('/:id',         c.update);
 router.patch('/:id/status',  c.updateStatus);
+router.delete('/:id',        c.remove);
 
 module.exports = router;

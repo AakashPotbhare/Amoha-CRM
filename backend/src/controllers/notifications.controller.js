@@ -55,4 +55,25 @@ async function markAllRead(req, res) {
   }
 }
 
-module.exports = { list, markRead, markAllRead };
+// DELETE /api/notifications/:id
+async function remove(req, res) {
+  try {
+    const { id } = req.params;
+    await db.query('DELETE FROM notifications WHERE id = ? AND recipient_employee_id = ?', [id, req.employee.id]);
+    return ok(res, { message: 'Notification deleted' });
+  } catch (err) {
+    return serverError(res, err);
+  }
+}
+
+// DELETE /api/notifications/all
+async function removeAll(req, res) {
+  try {
+    await db.query('DELETE FROM notifications WHERE recipient_employee_id = ?', [req.employee.id]);
+    return ok(res, { message: 'All notifications deleted' });
+  } catch (err) {
+    return serverError(res, err);
+  }
+}
+
+module.exports = { list, markRead, markAllRead, remove, removeAll };

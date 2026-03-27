@@ -95,6 +95,25 @@ export default function NotificationBell() {
     } catch { /* non-blocking */ }
   };
 
+  const dismissNotification = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    try {
+      await api.delete(`/api/notifications/${id}`);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setUnreadCount((prev) =>
+        Math.max(0, prev - (notifications.find((n) => n.id === id && !n.is_read) ? 1 : 0))
+      );
+    } catch { /* non-blocking */ }
+  };
+
+  const clearAllNotifications = async () => {
+    try {
+      await api.delete("/api/notifications/all");
+      setNotifications([]);
+      setUnreadCount(0);
+    } catch { /* non-blocking */ }
+  };
+
   return (
     <div ref={ref} className="relative">
       {/* Bell button */}
@@ -134,6 +153,15 @@ export default function NotificationBell() {
                   <CheckCheck className="h-4 w-4" />
                 </button>
               )}
+              {notifications.length > 0 && (
+                <button
+                  onClick={clearAllNotifications}
+                  title="Clear all notifications"
+                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive transition-colors text-[11px] font-medium px-1.5"
+                >
+                  Clear all
+                </button>
+              )}
               <button
                 onClick={() => setOpen(false)}
                 className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
@@ -151,40 +179,53 @@ export default function NotificationBell() {
               </p>
             ) : (
               notifications.map((n) => (
-                <button
+                <div
                   key={n.id}
-                  onClick={() => markRead(n)}
-                  className={`w-full text-left px-4 py-3 hover:bg-muted/60 transition-colors flex gap-3 items-start ${
+                  className={`relative flex gap-3 items-start px-4 py-3 hover:bg-muted/60 transition-colors group ${
                     !n.is_read ? "bg-blue-50/50 dark:bg-blue-950/20" : ""
                   }`}
                 >
-                  {/* Colour dot */}
-                  <span
-                    className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${TYPE_DOT[n.type] ?? "bg-blue-500"} ${
-                      n.is_read ? "opacity-30" : ""
-                    }`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={`text-sm leading-snug ${
-                        n.is_read ? "text-muted-foreground" : "font-medium text-foreground"
+                  {/* Main clickable area */}
+                  <button
+                    onClick={() => markRead(n)}
+                    className="flex gap-3 items-start flex-1 text-left min-w-0"
+                  >
+                    {/* Colour dot */}
+                    <span
+                      className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${TYPE_DOT[n.type] ?? "bg-blue-500"} ${
+                        n.is_read ? "opacity-30" : ""
                       }`}
-                    >
-                      {n.title}
-                    </p>
-                    {n.body && (
-                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
-                        {n.body}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p
+                        className={`text-sm leading-snug ${
+                          n.is_read ? "text-muted-foreground" : "font-medium text-foreground"
+                        }`}
+                      >
+                        {n.title}
                       </p>
+                      {n.body && (
+                        <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+                          {n.body}
+                        </p>
+                      )}
+                      <p className="mt-1 text-[11px] text-muted-foreground/70">
+                        {timeAgo(n.created_at)}
+                      </p>
+                    </div>
+                    {!n.is_read && (
+                      <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" />
                     )}
-                    <p className="mt-1 text-[11px] text-muted-foreground/70">
-                      {timeAgo(n.created_at)}
-                    </p>
-                  </div>
-                  {!n.is_read && (
-                    <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-blue-500" />
-                  )}
-                </button>
+                  </button>
+                  {/* Dismiss button */}
+                  <button
+                    onClick={(e) => dismissNotification(e, n.id)}
+                    title="Dismiss"
+                    className="flex-shrink-0 mt-0.5 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-muted text-muted-foreground hover:text-foreground transition-all"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))
             )}
           </div>

@@ -143,4 +143,21 @@ async function update(req, res) {
   }
 }
 
-module.exports = { list, getOne, create, updateStatus, update };
+// DELETE /api/tasks/:id
+async function remove(req, res) {
+  try {
+    const { id } = req.params;
+    const [rows] = await db.query('SELECT id, created_by_employee_id FROM tasks WHERE id = ?', [id]);
+    if (!rows.length) return notFound(res, 'Task not found');
+    const isAdmin = ['director','hr_head'].includes(req.employee.role);
+    if (!isAdmin && rows[0].created_by_employee_id !== req.employee.id) {
+      return res.status(403).json({ error: 'Not authorized to delete this task' });
+    }
+    await db.query('DELETE FROM tasks WHERE id = ?', [id]);
+    return ok(res, { message: 'Task deleted' });
+  } catch (err) {
+    return serverError(res, err);
+  }
+}
+
+module.exports = { list, getOne, create, updateStatus, update, remove };

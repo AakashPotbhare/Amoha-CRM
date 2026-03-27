@@ -194,4 +194,52 @@ async function reject(req, res) {
   }
 }
 
-module.exports = { list, submit, pendingForTL, pendingForManager, approveByTL, approveByManager, reject };
+// PATCH /api/leaves/:id — employee edits their own PENDING leave
+async function update(req, res) {
+  try {
+    const { id } = req.params;
+    const empId = req.employee.id;
+    // Employee can only edit their own PENDING leaves
+    const [rows] = await db.query(
+      'SELECT * FROM leave_requests WHERE id = ? AND employee_id = ? AND status = "pending"',
+      [id, empId]
+    );
+    if (!rows.length) return res.status(403).json({ error: 'Cannot edit this leave request' });
+    const allowed = ['leave_type','from_date','to_date','total_days','reason'];
+    const sets = [];
+    const vals = [];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        sets.push(`${key} = ?`);
+        vals.push(req.body[key]);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No valid fields' });
+    vals.push(id);
+    await db.query(`UPDATE leave_requests SET ${sets.join(', ')} WHERE id = ?`, vals);
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+// DELETE /api/leaves/:id
+async function remove(req, res) {
+  try {
+    const { id } = req.params;
+    const empId = req.employee.id;
+    const isAdmin = ['director','hr_head','hr'].includes(req.employee.role);
+    const whereClause = isAdmin
+      ? 'id = ?'
+      : 'id = ? AND employee_id = ? AND status = "pending"';
+    const whereVals = isAdmin ? [id] : [id, empId];
+    const [rows] = await db.query(`SELECT id FROM leave_requests WHERE ${whereClause}`, whereVals);
+    if (!rows.length) return res.status(403).json({ error: 'Cannot delete this leave request' });
+    await db.query('DELETE FROM leave_requests WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Leave request deleted' });
+  } catch (err) {
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+module.exports = { list, submit, pendingForTL, pendingForManager, approveByTL, approveByManager, reject, update, remove };

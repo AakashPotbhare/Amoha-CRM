@@ -333,4 +333,20 @@ async function updateCredentials(req, res) {
   }
 }
 
-module.exports = { list, pipelineStats, getOne, enroll, update, updateStage, updateCredentials };
+// DELETE /api/candidates/:id
+async function remove(req, res) {
+  try {
+    const { id } = req.params;
+    const isAdmin = ['director','hr_head'].includes(req.employee.role);
+    if (!isAdmin) return res.status(403).json({ error: 'Only directors can delete candidates' });
+    const [rows] = await db.query('SELECT id FROM candidate_enrollments WHERE id = ?', [id]);
+    if (!rows.length) return notFound(res, 'Candidate not found');
+    await db.query('DELETE FROM candidate_enrollments WHERE id = ?', [id]);
+    return ok(res, { message: 'Candidate deleted' });
+  } catch (err) {
+    console.error('candidates.remove error:', err);
+    return serverError(res, err);
+  }
+}
+
+module.exports = { list, pipelineStats, getOne, enroll, update, updateStage, updateCredentials, remove };

@@ -7,8 +7,18 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
   PlusCircle, Eye, IndianRupee, Calendar, Building2,
-  CheckCircle2, Clock, XCircle, AlertCircle, Loader2,
+  CheckCircle2, Clock, XCircle, AlertCircle, Loader2, Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PlacementOffer {
   id: string;
@@ -87,6 +97,8 @@ export default function PlacementOffers() {
   const [search, setSearch]       = useState("");
   const [period, setPeriod]       = useState("month");
   const [updating, setUpdating]   = useState(false);
+  const [deletingOfferId, setDeletingOfferId] = useState<string | null>(null);
+  const [deletingOffer, setDeletingOffer]     = useState(false);
 
   const leadership = ["director", "ops_head", "hr_head"];
   const tlRoles    = ["marketing_tl", "sales_head", "technical_head", "resume_head", "compliance_officer"];
@@ -139,6 +151,22 @@ export default function PlacementOffers() {
       toast({ title: "Update failed", description: err.message, variant: "destructive" });
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const deleteOffer = async () => {
+    if (!deletingOfferId) return;
+    setDeletingOffer(true);
+    try {
+      await api.delete(`/api/placement-orders/${deletingOfferId}`);
+      toast({ title: "Placement offer deleted" });
+      setDeletingOfferId(null);
+      setSelected(null);
+      fetchAll();
+    } catch (err: any) {
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    } finally {
+      setDeletingOffer(false);
     }
   };
 
@@ -280,6 +308,31 @@ export default function PlacementOffers() {
         </div>
       )}
 
+      {/* Delete Confirmation */}
+      <AlertDialog
+        open={!!deletingOfferId}
+        onOpenChange={(open) => { if (!open) setDeletingOfferId(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Placement Offer</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this placement offer? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingOffer}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteOffer}
+              disabled={deletingOffer}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingOffer ? <><Loader2 className="w-4 h-4 animate-spin mr-2" />Deleting…</> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Detail Modal */}
       {selected && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSelected(null)}>
@@ -406,6 +459,21 @@ export default function PlacementOffers() {
                   </button>
                 ))}
               </div>
+
+              {/* Delete — directors only */}
+              {employee?.role === "director" && (
+                <div className="border-t border-border pt-4">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setDeletingOfferId(selected.id)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Placement Offer
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>

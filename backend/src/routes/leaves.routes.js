@@ -14,5 +14,7 @@ router.get('/pending-manager',    requireRole(MGR_ROLES), c.pendingForManager);
 router.patch('/:id/approve-tl',   requireRole([...TL_ROLES, ...MGR_ROLES]), c.approveByTL);
 router.patch('/:id/approve-manager', requireRole(MGR_ROLES), c.approveByManager);
 router.patch('/:id/reject',       requireRole(APPROVERS), c.reject);
+router.patch('/:id',              c.update);
+router.delete('/:id',             c.remove);
 
 module.exports = router;

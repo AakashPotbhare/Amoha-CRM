@@ -244,4 +244,46 @@ async function addComment(req, res) {
   }
 }
 
-module.exports = { list, getOne, create, updateStatus, updateCallStatus, reassign, addComment };
+// PATCH /api/support-tasks/:id
+async function update(req, res) {
+  try {
+    const { id } = req.params;
+    const allowed = [
+      'teams_link','feedback','questions_asked','scheduled_at',
+      'due_date','company_name','interview_round','priority','status',
+      'call_status','completed_at','notes'
+    ];
+    const sets = [];
+    const vals = [];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        sets.push(`${key} = ?`);
+        vals.push(req.body[key]);
+      }
+    }
+    if (!sets.length) return res.status(400).json({ error: 'No valid fields provided' });
+    vals.push(id);
+    await db.query(`UPDATE support_tasks SET ${sets.join(', ')}, updated_at = NOW() WHERE id = ?`, vals);
+    const [rows] = await db.query('SELECT * FROM support_tasks WHERE id = ?', [id]);
+    return res.json({ success: true, data: rows[0] });
+  } catch (err) {
+    console.error('supportTasks.update error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+// DELETE /api/support-tasks/:id
+async function remove(req, res) {
+  try {
+    const { id } = req.params;
+    const [rows] = await db.query('SELECT id FROM support_tasks WHERE id = ?', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'Support task not found' });
+    await db.query('DELETE FROM support_tasks WHERE id = ?', [id]);
+    return res.json({ success: true, message: 'Support task deleted' });
+  } catch (err) {
+    console.error('supportTasks.remove error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+module.exports = { list, getOne, create, updateStatus, updateCallStatus, reassign, addComment, update, remove };

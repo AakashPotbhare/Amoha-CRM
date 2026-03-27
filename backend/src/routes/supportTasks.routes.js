@@ -11,5 +11,7 @@ router.patch('/:id/status',             c.updateStatus);
 router.patch('/:id/call-status',        c.updateCallStatus);
 router.patch('/:id/reassign',           requireRole(APPROVERS), c.reassign);
 router.post('/:id/comments',            c.addComment);
+router.patch('/:id',                    c.update);
+router.delete('/:id',                   requireRole(['director','hr_head','technical_head']), c.remove);
 
 module.exports = router;

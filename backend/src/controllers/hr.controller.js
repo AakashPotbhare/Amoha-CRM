@@ -243,6 +243,39 @@ async function createShift(req, res) {
   }
 }
 
+// PATCH /api/hr/shifts/:id
+async function updateShift(req, res) {
+  try {
+    const { id } = req.params;
+    const allowed = ['name','start_time','end_time','grace_period_minutes','required_hours','max_late_per_month'];
+    const sets = [];
+    const vals = [];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        sets.push(`${key} = ?`);
+        vals.push(req.body[key]);
+      }
+    }
+    if (!sets.length) return badRequest(res, 'No valid fields');
+    vals.push(id);
+    await db.query(`UPDATE shift_settings SET ${sets.join(', ')} WHERE id = ?`, vals);
+    return ok(res, { id });
+  } catch (err) {
+    return serverError(res, err);
+  }
+}
+
+// DELETE /api/hr/shifts/:id
+async function deleteShift(req, res) {
+  try {
+    const { id } = req.params;
+    await db.query('DELETE FROM shift_settings WHERE id = ?', [id]);
+    return ok(res, { message: 'Shift deleted' });
+  } catch (err) {
+    return serverError(res, err);
+  }
+}
+
 // ─── Office Locations ──────────────────────────────────────────────────────────
 
 // GET /api/hr/office-locations
@@ -271,6 +304,39 @@ async function createOfficeLocation(req, res) {
 
     const [[loc]] = await db.query('SELECT * FROM office_locations WHERE id = ?', [id]);
     return created(res, loc);
+  } catch (err) {
+    return serverError(res, err);
+  }
+}
+
+// PATCH /api/hr/office-locations/:id
+async function updateOfficeLocation(req, res) {
+  try {
+    const { id } = req.params;
+    const allowed = ['name','address','latitude','longitude','radius_meters'];
+    const sets = [];
+    const vals = [];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        sets.push(`${key} = ?`);
+        vals.push(req.body[key]);
+      }
+    }
+    if (!sets.length) return badRequest(res, 'No valid fields');
+    vals.push(id);
+    await db.query(`UPDATE office_locations SET ${sets.join(', ')} WHERE id = ?`, vals);
+    return ok(res, { id });
+  } catch (err) {
+    return serverError(res, err);
+  }
+}
+
+// DELETE /api/hr/office-locations/:id
+async function deleteOfficeLocation(req, res) {
+  try {
+    const { id } = req.params;
+    await db.query('DELETE FROM office_locations WHERE id = ?', [id]);
+    return ok(res, { message: 'Office location deleted' });
   } catch (err) {
     return serverError(res, err);
   }
@@ -315,7 +381,7 @@ module.exports = {
   listNotices, createNotice, updateNotice, deleteNotice,
   salaryHistory,
   listDocuments, uploadDocument, deleteDocument, uploadAvatar,
-  listShifts, createShift,
-  listOfficeLocations, createOfficeLocation,
+  listShifts, createShift, updateShift, deleteShift,
+  listOfficeLocations, createOfficeLocation, updateOfficeLocation, deleteOfficeLocation,
   leaveBalance,
 };

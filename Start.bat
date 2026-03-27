@@ -23,17 +23,17 @@ start "Amoha Backend" cmd /k "cd /d "%~dp0backend" && node src/app.js"
 timeout /t 3 /nobreak >nul
 
 :: ── 3. Start Frontend ─────────────────────────────────────────────────────────
-echo [3/3] Starting Frontend (port 5173)...
+echo [3/3] Starting Frontend (port 8080)...
 start "Amoha Frontend" cmd /k "cd /d "%~dp0frontend" && npm run dev"
 timeout /t 4 /nobreak >nul
 
 :: ── 4. Open Browser ───────────────────────────────────────────────────────────
 echo.
 echo  ==========================================
-echo   Opening http://localhost:5173
+echo   Opening http://localhost:8080
 echo  ==========================================
 echo.
-start "" "http://localhost:5173"
+start "" "http://localhost:8080"
 
 echo  Both servers are running in their own windows.
 echo  Close those windows to stop the servers.

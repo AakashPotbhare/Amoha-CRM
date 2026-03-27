@@ -185,7 +185,7 @@ export default function TechnicalDashboard() {
   const handleReassign = async (task: SupportTask) => {
     setAssigningId(task.id);
     try {
-      await api.patch(`/api/support-tasks/${task.id}/status`, { status: 'pending' });
+      await api.patch(`/api/support-tasks/${task.id}/reassign`, { status: 'pending' });
       toast({ title: "Reassigned", description: "Task has been reopened." });
       fetchTasks();
     } catch (err: any) {

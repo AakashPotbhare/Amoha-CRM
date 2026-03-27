@@ -21,8 +21,12 @@ router.delete('/documents/:employee_id/:doc_id',    c.deleteDocument);
 // Shifts & office locations
 router.get('/shifts',                     c.listShifts);
 router.post('/shifts',                    requireRole(SENIOR_LEADERSHIP), c.createShift);
+router.patch('/shifts/:id',               requireRole(SENIOR_LEADERSHIP), c.updateShift);
+router.delete('/shifts/:id',              requireRole(SENIOR_LEADERSHIP), c.deleteShift);
 router.get('/office-locations',           c.listOfficeLocations);
 router.post('/office-locations',          requireRole(SENIOR_LEADERSHIP), c.createOfficeLocation);
+router.patch('/office-locations/:id',     requireRole(SENIOR_LEADERSHIP), c.updateOfficeLocation);
+router.delete('/office-locations/:id',    requireRole(SENIOR_LEADERSHIP), c.deleteOfficeLocation);
 
 // Leave balance
 router.get('/leave-balance/:employee_id', c.leaveBalance);

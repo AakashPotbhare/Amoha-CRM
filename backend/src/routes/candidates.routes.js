@@ -12,5 +12,6 @@ router.post('/',             c.enroll);
 router.patch('/:id',         c.update);
 router.patch('/:id/stage',       requireRole([...APPROVERS, 'sales_executive', 'lead_generator']), c.updateStage);
 router.patch('/:id/credentials', c.updateCredentials);   // TL/marketing fills LinkedIn & marketing creds
+router.delete('/:id',            requireRole(['director','hr_head']), c.remove);
 
 module.exports = router;

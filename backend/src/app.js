@@ -16,11 +16,28 @@ app.use(helmet({
 }));
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',');
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
+function getEquivalentLoopbackOrigins(origin) {
+  if (!origin) return [];
+
+  return [
+    origin,
+    origin.replace('://localhost', '://127.0.0.1'),
+    origin.replace('://127.0.0.1', '://localhost'),
+  ];
+}
+
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow requests with no origin (curl, Postman) and listed origins
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    // Allow requests with no origin (curl, Postman) and common loopback aliases.
+    const allowedOriginSet = new Set(
+      allowedOrigins.flatMap(getEquivalentLoopbackOrigins)
+    );
+    if (!origin || allowedOriginSet.has(origin)) return cb(null, true);
     cb(new Error(`CORS: origin ${origin} not allowed`));
   },
   credentials: true,

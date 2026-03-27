@@ -153,22 +153,13 @@ export default function LeaveManagement() {
 
     const TL_ROLES = ["marketing_tl", "sales_head", "technical_head", "resume_head", "assistant_tl"];
     const isTL = TL_ROLES.includes(employee.role);
-    const needsManagerApproval = request.total_days >= 3;
-
-    const updateData: Record<string, any> = isTL
-      ? {
-          status: needsManagerApproval ? "approved_by_tl" : "approved",
-          approved_by_tl: employee.id,
-          approved_by_tl_at: new Date().toISOString(),
-        }
-      : {
-          status: "approved",
-          approved_by_manager: employee.id,
-          approved_by_manager_at: new Date().toISOString(),
-        };
 
     try {
-      await api.patch(`/api/leaves/${request.id}`, updateData);
+      if (isTL) {
+        await api.patch(`/api/leaves/${request.id}/approve-tl`, {});
+      } else {
+        await api.patch(`/api/leaves/${request.id}/approve-manager`, {});
+      }
       toast({ title: "Leave approved" });
       fetchData();
     } catch (err: any) {
@@ -179,10 +170,7 @@ export default function LeaveManagement() {
   const handleReject = async (requestId: string) => {
     if (!employee) return;
     try {
-      await api.patch(`/api/leaves/${requestId}`, {
-        status: "rejected",
-        rejected_by: employee.id,
-      });
+      await api.patch(`/api/leaves/${requestId}/reject`, { reason: "" });
       toast({ title: "Leave rejected" });
       fetchData();
     } catch (err: any) {

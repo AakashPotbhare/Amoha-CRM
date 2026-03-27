@@ -66,7 +66,7 @@ export default function TaskInbox() {
 
   const handleStatusUpdate = async (taskId: string, newStatus: string) => {
     try {
-      await api.patch(`/api/tasks/${taskId}`, {
+      await api.patch(`/api/tasks/${taskId}/status`, {
         status: newStatus,
         ...(newStatus === "completed" ? { completed_at: new Date().toISOString() } : {}),
       });

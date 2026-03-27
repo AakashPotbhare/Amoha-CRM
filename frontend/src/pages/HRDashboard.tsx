@@ -4,14 +4,21 @@ import { api } from "@/lib/api.client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import {
   UserPlus, Users, Search, Edit2, KeyRound, History,
   IndianRupee, Download, Clock, CheckCircle,
   XCircle, Loader2, Shield, Eye, EyeOff, RefreshCw,
+  Trash2, MapPin, Plus,
 } from "lucide-react";
 import { format, parseISO, differenceInDays, addDays } from "date-fns";
 import HRNoticeManager from "@/components/HRNoticeManager";
@@ -69,6 +76,24 @@ interface PayrollRow {
   absent: number;
   wfh: number;
   total_hours: number;
+}
+
+interface Shift {
+  id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  grace_minutes: number;
+  description: string | null;
+}
+
+interface OfficeLocation {
+  id: string;
+  name: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  radius_meters: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -192,6 +217,38 @@ export default function HRDashboard() {
   const [resetTarget, setResetTarget]     = useState<Employee | null>(null);
   const [resetPwd, setResetPwd]           = useState("Amoha@2026");
   const [resetting, setResetting]         = useState(false);
+
+  // ── Shifts tab ───────────────────────────────────────────────────────────────
+  const [shifts, setShifts]               = useState<Shift[]>([]);
+  const [shiftsLoading, setShiftsLoading] = useState(false);
+  const [editingShift, setEditingShift]   = useState<Shift | null>(null);
+  const [editShiftForm, setEditShiftForm] = useState({
+    name: "", start_time: "", end_time: "", grace_minutes: 15, description: "",
+  });
+  const [shiftDialogOpen, setShiftDialogOpen]   = useState(false);
+  const [deletingShift, setDeletingShift]       = useState<Shift | null>(null);
+  const [savingShift, setSavingShift]           = useState(false);
+  // Add-shift form
+  const [addShiftOpen, setAddShiftOpen]         = useState(false);
+  const [addShiftForm, setAddShiftForm]         = useState({
+    name: "", start_time: "09:00", end_time: "18:00", grace_minutes: 15, description: "",
+  });
+
+  // ── Office Locations tab ─────────────────────────────────────────────────────
+  const [locations, setLocations]                   = useState<OfficeLocation[]>([]);
+  const [locationsLoading, setLocationsLoading]     = useState(false);
+  const [editingLocation, setEditingLocation]       = useState<OfficeLocation | null>(null);
+  const [editLocationForm, setEditLocationForm]     = useState({
+    name: "", address: "", latitude: 0, longitude: 0, radius_meters: 100,
+  });
+  const [locationDialogOpen, setLocationDialogOpen] = useState(false);
+  const [deletingLocation, setDeletingLocation]     = useState<OfficeLocation | null>(null);
+  const [savingLocation, setSavingLocation]         = useState(false);
+  // Add-location form
+  const [addLocationOpen, setAddLocationOpen]       = useState(false);
+  const [addLocationForm, setAddLocationForm]       = useState({
+    name: "", address: "", latitude: 0, longitude: 0, radius_meters: 100,
+  });
 
   // ── Load master data ────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -408,6 +465,162 @@ export default function HRDashboard() {
     toast({ title: "Downloaded", description: `Payroll for ${MONTH_NAMES[payMonth - 1]} ${payYear}` });
   }
 
+  // ── Shift fetch & handlers ───────────────────────────────────────────────────
+  const fetchShifts = useCallback(async () => {
+    setShiftsLoading(true);
+    try {
+      const res = await api.get<Shift[]>("/api/hr/shifts");
+      if (res.success && res.data) setShifts(res.data);
+    } catch { /* ignore */ } finally { setShiftsLoading(false); }
+  }, []);
+
+  function openEditShift(shift: Shift) {
+    setEditingShift(shift);
+    setEditShiftForm({
+      name: shift.name,
+      start_time: shift.start_time,
+      end_time: shift.end_time,
+      grace_minutes: shift.grace_minutes,
+      description: shift.description || "",
+    });
+    setShiftDialogOpen(true);
+  }
+
+  async function handleSaveShift() {
+    if (!editingShift) return;
+    if (!editShiftForm.name.trim()) {
+      toast({ title: "Shift name is required", variant: "destructive" }); return;
+    }
+    setSavingShift(true);
+    try {
+      await api.patch(`/api/hr/shifts/${editingShift.id}`, {
+        name: editShiftForm.name.trim(),
+        start_time: editShiftForm.start_time,
+        end_time: editShiftForm.end_time,
+        grace_minutes: Number(editShiftForm.grace_minutes),
+        description: editShiftForm.description.trim() || null,
+      });
+      toast({ title: "Shift updated successfully" });
+      setShiftDialogOpen(false);
+      setEditingShift(null);
+      fetchShifts();
+    } catch (err: any) {
+      toast({ title: "Failed to update shift", description: err?.message, variant: "destructive" });
+    } finally { setSavingShift(false); }
+  }
+
+  async function handleDeleteShift() {
+    if (!deletingShift) return;
+    try {
+      await api.delete(`/api/hr/shifts/${deletingShift.id}`);
+      toast({ title: "Shift deleted" });
+      setDeletingShift(null);
+      fetchShifts();
+    } catch (err: any) {
+      toast({ title: "Failed to delete shift", description: err?.message, variant: "destructive" });
+    }
+  }
+
+  async function handleAddShift() {
+    if (!addShiftForm.name.trim()) {
+      toast({ title: "Shift name is required", variant: "destructive" }); return;
+    }
+    setSavingShift(true);
+    try {
+      await api.post("/api/hr/shifts", {
+        name: addShiftForm.name.trim(),
+        start_time: addShiftForm.start_time,
+        end_time: addShiftForm.end_time,
+        grace_minutes: Number(addShiftForm.grace_minutes),
+        description: addShiftForm.description.trim() || null,
+      });
+      toast({ title: "Shift created successfully" });
+      setAddShiftOpen(false);
+      setAddShiftForm({ name: "", start_time: "09:00", end_time: "18:00", grace_minutes: 15, description: "" });
+      fetchShifts();
+    } catch (err: any) {
+      toast({ title: "Failed to create shift", description: err?.message, variant: "destructive" });
+    } finally { setSavingShift(false); }
+  }
+
+  // ── Office Location fetch & handlers ─────────────────────────────────────────
+  const fetchLocations = useCallback(async () => {
+    setLocationsLoading(true);
+    try {
+      const res = await api.get<OfficeLocation[]>("/api/hr/office-locations");
+      if (res.success && res.data) setLocations(res.data);
+    } catch { /* ignore */ } finally { setLocationsLoading(false); }
+  }, []);
+
+  function openEditLocation(loc: OfficeLocation) {
+    setEditingLocation(loc);
+    setEditLocationForm({
+      name: loc.name,
+      address: loc.address || "",
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      radius_meters: loc.radius_meters,
+    });
+    setLocationDialogOpen(true);
+  }
+
+  async function handleSaveLocation() {
+    if (!editingLocation) return;
+    if (!editLocationForm.name.trim()) {
+      toast({ title: "Location name is required", variant: "destructive" }); return;
+    }
+    setSavingLocation(true);
+    try {
+      await api.patch(`/api/hr/office-locations/${editingLocation.id}`, {
+        name: editLocationForm.name.trim(),
+        address: editLocationForm.address.trim() || null,
+        latitude: Number(editLocationForm.latitude),
+        longitude: Number(editLocationForm.longitude),
+        radius_meters: Number(editLocationForm.radius_meters),
+      });
+      toast({ title: "Office location updated successfully" });
+      setLocationDialogOpen(false);
+      setEditingLocation(null);
+      fetchLocations();
+    } catch (err: any) {
+      toast({ title: "Failed to update location", description: err?.message, variant: "destructive" });
+    } finally { setSavingLocation(false); }
+  }
+
+  async function handleDeleteLocation() {
+    if (!deletingLocation) return;
+    try {
+      await api.delete(`/api/hr/office-locations/${deletingLocation.id}`);
+      toast({ title: "Office location deleted" });
+      setDeletingLocation(null);
+      fetchLocations();
+    } catch (err: any) {
+      toast({ title: "Failed to delete location", description: err?.message, variant: "destructive" });
+    }
+  }
+
+  async function handleAddLocation() {
+    if (!addLocationForm.name.trim()) {
+      toast({ title: "Location name is required", variant: "destructive" }); return;
+    }
+    setSavingLocation(true);
+    try {
+      await api.post("/api/hr/office-locations", {
+        name: addLocationForm.name.trim(),
+        address: addLocationForm.address.trim() || null,
+        latitude: Number(addLocationForm.latitude),
+        longitude: Number(addLocationForm.longitude),
+        radius_meters: Number(addLocationForm.radius_meters),
+      });
+      toast({ title: "Office location created successfully" });
+      setAddLocationOpen(false);
+      setAddLocationForm({ name: "", address: "", latitude: 0, longitude: 0, radius_meters: 100 });
+      fetchLocations();
+    } catch (err: any) {
+      toast({ title: "Failed to create location", description: err?.message, variant: "destructive" });
+    } finally { setSavingLocation(false); }
+  }
+
   // ── Access guard ─────────────────────────────────────────────────────────────
   if (!isHR) {
     return (
@@ -478,6 +691,8 @@ export default function HRDashboard() {
             )}
           </TabsTrigger>
           <TabsTrigger value="notices">Notice Board</TabsTrigger>
+          <TabsTrigger value="shifts" onClick={() => { if (!shifts.length) fetchShifts(); }}>Shifts</TabsTrigger>
+          <TabsTrigger value="locations" onClick={() => { if (!locations.length) fetchLocations(); }}>Office Locations</TabsTrigger>
         </TabsList>
 
         {/* ════════════════════════════════════════════════════
@@ -817,6 +1032,165 @@ export default function HRDashboard() {
         <TabsContent value="notices">
           <HRNoticeManager />
         </TabsContent>
+
+        {/* ════════════════════════════════════════════════════
+            TAB 5 — SHIFT MANAGEMENT
+        ════════════════════════════════════════════════════ */}
+        <TabsContent value="shifts" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Shift Management</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Define and manage work shifts for attendance tracking.</p>
+            </div>
+            {(employee?.role === "director" || employee?.role === "hr_head") && (
+              <Button size="sm" className="gap-2" onClick={() => setAddShiftOpen(true)}>
+                <Plus className="w-4 h-4" /> Add Shift
+              </Button>
+            )}
+          </div>
+
+          {shiftsLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : shifts.length === 0 ? (
+            <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground">
+              No shifts configured yet.
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Shift Name</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Start Time</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">End Time</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Grace (mins)</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Description</th>
+                      {(employee?.role === "director" || employee?.role === "hr_head") && (
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shifts.map(shift => (
+                      <tr key={shift.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-3 font-medium text-foreground">{shift.name}</td>
+                        <td className="px-4 py-3 text-foreground">{shift.start_time}</td>
+                        <td className="px-4 py-3 text-foreground">{shift.end_time}</td>
+                        <td className="px-4 py-3 text-foreground">{shift.grace_minutes}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{shift.description || "—"}</td>
+                        {(employee?.role === "director" || employee?.role === "hr_head") && (
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => openEditShift(shift)}
+                                title="Edit shift"
+                                className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setDeletingShift(shift)}
+                                title="Delete shift"
+                                className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ════════════════════════════════════════════════════
+            TAB 6 — OFFICE LOCATIONS
+        ════════════════════════════════════════════════════ */}
+        <TabsContent value="locations" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Office Locations</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Geo-fenced locations used for attendance check-in validation.</p>
+            </div>
+            {(employee?.role === "director" || employee?.role === "hr_head") && (
+              <Button size="sm" className="gap-2" onClick={() => setAddLocationOpen(true)}>
+                <Plus className="w-4 h-4" /> Add Location
+              </Button>
+            )}
+          </div>
+
+          {locationsLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : locations.length === 0 ? (
+            <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground">
+              No office locations configured yet.
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/30">
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Address</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Coordinates</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Radius (m)</th>
+                      {(employee?.role === "director" || employee?.role === "hr_head") && (
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {locations.map(loc => (
+                      <tr key={loc.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
+                        <td className="px-4 py-3 font-medium text-foreground">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            {loc.name}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{loc.address || "—"}</td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs font-mono">
+                          {loc.latitude.toFixed(6)}, {loc.longitude.toFixed(6)}
+                        </td>
+                        <td className="px-4 py-3 text-foreground">{loc.radius_meters}</td>
+                        {(employee?.role === "director" || employee?.role === "hr_head") && (
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => openEditLocation(loc)}
+                                title="Edit location"
+                                className="p-1.5 rounded-md hover:bg-primary/10 text-muted-foreground hover:text-primary transition-colors"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => setDeletingLocation(loc)}
+                                title="Delete location"
+                                className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
 
       {/* ═══════════════════════════════════════════════
@@ -1035,6 +1409,314 @@ export default function HRDashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ═══════════════════════════════════════════════
+          EDIT SHIFT DIALOG
+      ═══════════════════════════════════════════════ */}
+      <Dialog open={shiftDialogOpen} onOpenChange={v => { if (!v) { setShiftDialogOpen(false); setEditingShift(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Shift — {editingShift?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Shift Name *</Label>
+              <Input
+                value={editShiftForm.name}
+                onChange={e => setEditShiftForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Morning Shift"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Start Time</Label>
+                <Input
+                  type="time"
+                  value={editShiftForm.start_time}
+                  onChange={e => setEditShiftForm(f => ({ ...f, start_time: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>End Time</Label>
+                <Input
+                  type="time"
+                  value={editShiftForm.end_time}
+                  onChange={e => setEditShiftForm(f => ({ ...f, end_time: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Grace Minutes</Label>
+              <Input
+                type="number"
+                min="0"
+                max="60"
+                value={editShiftForm.grace_minutes}
+                onChange={e => setEditShiftForm(f => ({ ...f, grace_minutes: Number(e.target.value) }))}
+              />
+            </div>
+            <div>
+              <Label>Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Textarea
+                value={editShiftForm.description}
+                onChange={e => setEditShiftForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Any notes about this shift…"
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t mt-4">
+            <Button variant="outline" onClick={() => { setShiftDialogOpen(false); setEditingShift(null); }}>Cancel</Button>
+            <Button onClick={handleSaveShift} disabled={savingShift}>
+              {savingShift ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════
+          ADD SHIFT DIALOG
+      ═══════════════════════════════════════════════ */}
+      <Dialog open={addShiftOpen} onOpenChange={v => { if (!v) setAddShiftOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Shift</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Shift Name *</Label>
+              <Input
+                value={addShiftForm.name}
+                onChange={e => setAddShiftForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Morning Shift"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Start Time</Label>
+                <Input
+                  type="time"
+                  value={addShiftForm.start_time}
+                  onChange={e => setAddShiftForm(f => ({ ...f, start_time: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>End Time</Label>
+                <Input
+                  type="time"
+                  value={addShiftForm.end_time}
+                  onChange={e => setAddShiftForm(f => ({ ...f, end_time: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Grace Minutes</Label>
+              <Input
+                type="number"
+                min="0"
+                max="60"
+                value={addShiftForm.grace_minutes}
+                onChange={e => setAddShiftForm(f => ({ ...f, grace_minutes: Number(e.target.value) }))}
+              />
+            </div>
+            <div>
+              <Label>Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Textarea
+                value={addShiftForm.description}
+                onChange={e => setAddShiftForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="Any notes about this shift…"
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t mt-4">
+            <Button variant="outline" onClick={() => setAddShiftOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddShift} disabled={savingShift}>
+              {savingShift ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Create Shift
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════
+          DELETE SHIFT CONFIRMATION
+      ═══════════════════════════════════════════════ */}
+      <AlertDialog open={!!deletingShift} onOpenChange={v => { if (!v) setDeletingShift(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Shift?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete this shift? Employees assigned to it may be affected.
+              {deletingShift && <strong className="block mt-1">"{deletingShift.name}"</strong>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingShift(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteShift}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ═══════════════════════════════════════════════
+          EDIT OFFICE LOCATION DIALOG
+      ═══════════════════════════════════════════════ */}
+      <Dialog open={locationDialogOpen} onOpenChange={v => { if (!v) { setLocationDialogOpen(false); setEditingLocation(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Location — {editingLocation?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Name *</Label>
+              <Input
+                value={editLocationForm.name}
+                onChange={e => setEditLocationForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Head Office"
+              />
+            </div>
+            <div>
+              <Label>Address</Label>
+              <Input
+                value={editLocationForm.address}
+                onChange={e => setEditLocationForm(f => ({ ...f, address: e.target.value }))}
+                placeholder="Full address"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Latitude</Label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  value={editLocationForm.latitude}
+                  onChange={e => setEditLocationForm(f => ({ ...f, latitude: Number(e.target.value) }))}
+                />
+              </div>
+              <div>
+                <Label>Longitude</Label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  value={editLocationForm.longitude}
+                  onChange={e => setEditLocationForm(f => ({ ...f, longitude: Number(e.target.value) }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Radius (meters)</Label>
+              <Input
+                type="number"
+                min="10"
+                value={editLocationForm.radius_meters}
+                onChange={e => setEditLocationForm(f => ({ ...f, radius_meters: Number(e.target.value) }))}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t mt-4">
+            <Button variant="outline" onClick={() => { setLocationDialogOpen(false); setEditingLocation(null); }}>Cancel</Button>
+            <Button onClick={handleSaveLocation} disabled={savingLocation}>
+              {savingLocation ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Save Changes
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════
+          ADD OFFICE LOCATION DIALOG
+      ═══════════════════════════════════════════════ */}
+      <Dialog open={addLocationOpen} onOpenChange={v => { if (!v) setAddLocationOpen(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Office Location</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label>Name *</Label>
+              <Input
+                value={addLocationForm.name}
+                onChange={e => setAddLocationForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. Head Office"
+              />
+            </div>
+            <div>
+              <Label>Address</Label>
+              <Input
+                value={addLocationForm.address}
+                onChange={e => setAddLocationForm(f => ({ ...f, address: e.target.value }))}
+                placeholder="Full address"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Latitude</Label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  value={addLocationForm.latitude}
+                  onChange={e => setAddLocationForm(f => ({ ...f, latitude: Number(e.target.value) }))}
+                />
+              </div>
+              <div>
+                <Label>Longitude</Label>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  value={addLocationForm.longitude}
+                  onChange={e => setAddLocationForm(f => ({ ...f, longitude: Number(e.target.value) }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Radius (meters)</Label>
+              <Input
+                type="number"
+                min="10"
+                value={addLocationForm.radius_meters}
+                onChange={e => setAddLocationForm(f => ({ ...f, radius_meters: Number(e.target.value) }))}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t mt-4">
+            <Button variant="outline" onClick={() => setAddLocationOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddLocation} disabled={savingLocation}>
+              {savingLocation ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Create Location
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════
+          DELETE OFFICE LOCATION CONFIRMATION
+      ═══════════════════════════════════════════════ */}
+      <AlertDialog open={!!deletingLocation} onOpenChange={v => { if (!v) setDeletingLocation(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Office Location?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete this office location? This will affect attendance check-in validation.
+              {deletingLocation && <strong className="block mt-1">"{deletingLocation.name}"</strong>}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingLocation(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteLocation}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
