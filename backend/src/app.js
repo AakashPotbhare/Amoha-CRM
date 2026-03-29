@@ -76,6 +76,7 @@ app.use('/api/notifications',     require('./routes/notifications.routes'));
 app.use('/api/placement-orders', require('./routes/placementOffers.routes'));
 app.use('/api/analytics',       require('./routes/analytics.routes'));
 app.use('/api/chat',            require('./routes/chat.routes'));
+app.use('/api/search',          require('./routes/search.routes'));
 
 // ─── Top-level meta aliases (departments, teams) ───────────────────────────
 // Mounted separately so /api/departments and /api/teams work without the

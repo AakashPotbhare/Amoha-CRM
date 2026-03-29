@@ -1,13 +1,27 @@
-import { ReactNode, useState } from "react";
-import { Menu } from "lucide-react";
+import { ReactNode, useState, useEffect } from "react";
+import { Menu, Search } from "lucide-react";
 import AppSidebar from "./AppSidebar";
 import NotificationBell from "./NotificationBell";
 import ChatWidget from "./ChatWidget";
 import ThemeToggle from "./ThemeToggle";
+import GlobalSearch from "./GlobalSearch";
 import amohaLogo from "@/assets/amoha_logo.png";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Global Ctrl+K / Cmd+K shortcut
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -54,8 +68,16 @@ export default function AppLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
 
-          {/* Right side: theme toggle + notification bell */}
+          {/* Right side: search button | theme toggle | notification bell */}
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => setSearchOpen(true)}
+              className="p-1.5 rounded-md hover:bg-muted transition-colors"
+              aria-label="Search (Ctrl+K)"
+              title="Search (Ctrl+K)"
+            >
+              <Search className="w-5 h-5 text-muted-foreground" />
+            </button>
             <ThemeToggle />
             <NotificationBell />
           </div>
@@ -67,6 +89,9 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       </div>
 
       <ChatWidget />
+
+      {/* Global search dialog */}
+      <GlobalSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const db = require('../config/db');
 const { ok, created, notFound, badRequest, serverError } = require('../utils/response');
+const { sendWelcomeEmail } = require('../services/email.service');
 
 const VALID_ROLES = [
   'director','ops_head','hr_head',
@@ -165,6 +166,9 @@ async function create(req, res) {
        WHERE e.id = ?`,
       [id]
     );
+    // Send welcome email with credentials (fire-and-forget)
+    sendWelcomeEmail(emp, password).catch(() => {});
+
     return created(res, { ...emp, defaultPassword: password });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') {

@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db');
 const { createNotification, notifyMany } = require('../services/notification.service');
+const { sendLeaveStatusEmail } = require('../services/email.service');
 const { ok, created, notFound, badRequest, serverError } = require('../utils/response');
 
 const LEAVE_TYPES = ['paid', 'unpaid', 'sick', 'casual'];
@@ -363,6 +364,12 @@ async function approveByManager(req, res) {
       entity_id: req.params.id,
     });
 
+    // Send email notification
+    const [[requester]] = await db.query('SELECT email, full_name FROM employees WHERE id = ?', [request.employee_id]);
+    if (requester) {
+      await sendLeaveStatusEmail(requester.email, requester.full_name, request, 'approved');
+    }
+
     return ok(res, { id: req.params.id, status: 'approved' });
   } catch (err) {
     return serverError(res, err);
@@ -396,6 +403,12 @@ async function reject(req, res) {
       entity_type: 'leave_request',
       entity_id: req.params.id,
     });
+
+    // Send email notification
+    const [[requester]] = await db.query('SELECT email, full_name FROM employees WHERE id = ?', [request.employee_id]);
+    if (requester) {
+      await sendLeaveStatusEmail(requester.email, requester.full_name, request, 'rejected', reason);
+    }
 
     return ok(res, { id: req.params.id, status: 'rejected' });
   } catch (err) {

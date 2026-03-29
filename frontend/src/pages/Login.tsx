@@ -1,21 +1,23 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/lib/api.client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { KeyRound, Mail, ArrowLeft, Loader2 } from 'lucide-react';
+import { KeyRound, Mail, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import amohaLogo from '@/assets/amoha_logo.png';
 
 export default function Login() {
-  const { signIn, resetPassword } = useAuth();
+  const { signIn } = useAuth();
   const { toast } = useToast();
   const [employeeCode, setEmployeeCode] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showReset, setShowReset] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
+  const [resetValue, setResetValue] = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,18 +34,19 @@ export default function Login() {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetEmail.trim()) return;
+    const val = resetValue.trim();
+    if (!val) return;
 
     setLoading(true);
-    const { error } = await resetPassword(resetEmail.trim());
-    setLoading(false);
-
-    if (error) {
-      toast({ variant: 'destructive', title: 'Error', description: error });
-    } else {
-      toast({ title: 'Email Sent', description: 'Check your Gmail for the password reset link.' });
-      setShowReset(false);
-      setResetEmail('');
+    try {
+      const payload = val.includes('@') ? { email: val } : { employee_code: val };
+      await api.post('/api/auth/forgot-password', payload);
+      setResetSent(true);
+    } catch {
+      // Still show success to avoid leaking account existence
+      setResetSent(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -122,39 +125,51 @@ export default function Login() {
             <>
               <CardHeader className="pb-4">
                 <button
-                  onClick={() => setShowReset(false)}
+                  onClick={() => { setShowReset(false); setResetSent(false); setResetValue(''); }}
                   className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-2"
                 >
                   <ArrowLeft className="w-3 h-3" /> Back to login
                 </button>
-                <h2 className="text-lg font-semibold text-foreground">Reset Password</h2>
+                <h2 className="text-lg font-semibold text-foreground">Forgot Password</h2>
                 <p className="text-sm text-muted-foreground">
-                  Enter your registered Gmail to receive a reset link
+                  Enter your employee code or registered email
                 </p>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleReset} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Registered Gmail</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="yourname@gmail.com"
-                        value={resetEmail}
-                        onChange={(e) => setResetEmail(e.target.value)}
-                        className="pl-10"
-                        maxLength={255}
-                      />
-                    </div>
+                {resetSent ? (
+                  <div className="space-y-4 text-center py-2">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto" />
+                    <p className="font-medium">Reset link sent!</p>
+                    <p className="text-sm text-muted-foreground">
+                      If that account exists, a password reset link has been sent to the registered email. It expires in 1 hour.
+                    </p>
+                    <Button variant="outline" className="w-full" onClick={() => { setShowReset(false); setResetSent(false); setResetValue(''); }}>
+                      Back to Sign In
+                    </Button>
                   </div>
-
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Send Reset Link
-                  </Button>
-                </form>
+                ) : (
+                  <form onSubmit={handleReset} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="reset-val">Employee Code or Email</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          id="reset-val"
+                          placeholder="ARS20240001 or you@example.com"
+                          value={resetValue}
+                          onChange={(e) => setResetValue(e.target.value)}
+                          className="pl-10 w-full"
+                          autoComplete="email"
+                          maxLength={255}
+                        />
+                      </div>
+                    </div>
+                    <Button type="submit" className="w-full" disabled={loading || !resetValue.trim()}>
+                      {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      Send Reset Link
+                    </Button>
+                  </form>
+                )}
               </CardContent>
             </>
           )}

@@ -10,8 +10,9 @@
  * for a daily reminder use-case).
  */
 
-const db                    = require('../config/db');
-const { createNotification } = require('./notification.service');
+const db                         = require('../config/db');
+const { createNotification }      = require('./notification.service');
+const { sendPaymentReminderEmail } = require('./email.service');
 
 // In-memory dedup: "<candidateId>:<YYYY-MM-DD>" → prevents double-firing within the same day
 const _sent = new Set();
@@ -60,6 +61,15 @@ async function checkPaymentReminders() {
 
       _sent.add(dedupKey);
       console.log(`[paymentReminder] Notified salesperson for ${c.full_name} — due ${label}`);
+
+      // Also send email to the salesperson
+      const [[salesperson]] = await db.query(
+        'SELECT full_name, email FROM employees WHERE id = ?',
+        [c.salesperson_employee_id]
+      );
+      if (salesperson) {
+        await sendPaymentReminderEmail(salesperson, c, isToday ? 0 : 1);
+      }
     }
   } catch (err) {
     console.error('[paymentReminder] Error:', err.message);

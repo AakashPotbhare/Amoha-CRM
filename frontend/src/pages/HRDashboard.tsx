@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { format, parseISO, differenceInDays, addDays } from "date-fns";
 import HRNoticeManager from "@/components/HRNoticeManager";
+import { exportToExcel, exportToPDF, payrollColumns, formatPayrollForExport } from "@/lib/exportUtils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -894,9 +895,17 @@ export default function HRDashboard() {
               Generate
             </Button>
             {payrollData.length > 0 && (
-              <Button variant="outline" size="sm" onClick={downloadPayrollCSV} className="gap-2 w-full sm:w-auto sm:ml-auto">
-                <Download className="w-4 h-4" /> Export CSV
-              </Button>
+              <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:ml-auto">
+                <Button variant="outline" size="sm" onClick={downloadPayrollCSV} className="gap-2">
+                  <Download className="w-4 h-4" /> CSV
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToExcel(formatPayrollForExport(payrollData as unknown as Record<string, unknown>[]), payrollColumns, `Payroll_${MONTH_NAMES[payMonth - 1]}_${payYear}`)}>
+                  <Download className="w-4 h-4" /> Excel
+                </Button>
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => exportToPDF(formatPayrollForExport(payrollData as unknown as Record<string, unknown>[]), payrollColumns, `Payroll Report – ${MONTH_NAMES[payMonth - 1]} ${payYear}`, `Payroll_${MONTH_NAMES[payMonth - 1]}_${payYear}`)}>
+                  <Download className="w-4 h-4" /> PDF
+                </Button>
+              </div>
             )}
           </div>
 

@@ -11,7 +11,8 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { BarChart3, Briefcase, CalendarDays, ChevronDown, ChevronUp, Clock3, Loader2, Users, WrenchIcon } from "lucide-react";
+import { BarChart3, Briefcase, CalendarDays, ChevronDown, ChevronUp, Clock3, Download, Loader2, Users, WrenchIcon } from "lucide-react";
+import { exportToExcel, exportToPDF, attendanceColumns, formatAttendanceForExport } from "@/lib/exportUtils";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api.client";
@@ -371,6 +372,26 @@ export default function AttendanceReport() {
           <h1 className="text-xl md:text-2xl font-bold text-foreground">Attendance Report</h1>
           <p className="text-sm text-muted-foreground">Monthly summary with an employee-wise attendance calendar</p>
         </div>
+        {records.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => exportToExcel(formatAttendanceForExport(records as unknown as Record<string, unknown>[]), attendanceColumns, `Attendance_${year}_${String(month).padStart(2,"0")}`)}
+            >
+              <Download className="w-4 h-4" /> Excel
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => exportToPDF(formatAttendanceForExport(records as unknown as Record<string, unknown>[]), attendanceColumns, `Attendance Report – ${year}/${String(month).padStart(2,"0")}`, `Attendance_${year}_${String(month).padStart(2,"0")}`)}
+            >
+              <Download className="w-4 h-4" /> PDF
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
