@@ -13,6 +13,7 @@ import TaskInbox from "@/pages/TaskInbox";
 import CreateTask from "@/pages/CreateTask";
 import CreateSupportTask from "@/pages/CreateSupportTask";
 import Candidates from "@/pages/Candidates";
+import CandidateDetail from "@/pages/CandidateDetail";
 import MarketingDepartment from "@/pages/MarketingDepartment";
 import TechnicalDashboard from "@/pages/TechnicalDashboard";
 import MySupportQueue from "@/pages/MySupportQueue";
@@ -166,6 +167,14 @@ const App = () => (
                         element={
                           <ProtectedRoute requiredPermission="candidates.read">
                             <Candidates />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/candidates/:id"
+                        element={
+                          <ProtectedRoute requiredPermission="candidates.read">
+                            <CandidateDetail />
                           </ProtectedRoute>
                         }
                       />

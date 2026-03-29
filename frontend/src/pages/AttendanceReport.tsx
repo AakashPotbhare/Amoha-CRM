@@ -11,7 +11,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { BarChart3, Briefcase, CalendarDays, Clock3, Users } from "lucide-react";
+import { BarChart3, Briefcase, CalendarDays, ChevronDown, ChevronUp, Clock3, Loader2, Users, WrenchIcon } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api.client";
@@ -19,6 +19,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 interface AttendanceRow {
@@ -139,8 +145,12 @@ function getDayMeta(date: Date, row?: AttendanceRow): CalendarDayMeta {
   return { date, status: "present", label: "Present", note: "Marked present", totalHours: row.total_hours };
 }
 
+interface EmployeeOption { id: string; full_name: string; employee_code: string; }
+interface AttendanceRecord { id: string; date: string; check_in_time: string | null; check_out_time: string | null; attendance_status: string; is_wfh: boolean; }
+
 export default function AttendanceReport() {
   const { employee } = useAuth();
+  const { toast } = useToast();
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [records, setRecords] = useState<AttendanceRow[]>([]);
@@ -148,11 +158,85 @@ export default function AttendanceReport() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Admin override state
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [allEmployees, setAllEmployees] = useState<EmployeeOption[]>([]);
+  const [overrideSaving, setOverrideSaving] = useState(false);
+  // Create manual entry form
+  const [manualForm, setManualForm] = useState({ employee_id: "", date: "", check_in_time: "", check_out_time: "", attendance_status: "present", is_wfh: false, notes: "" });
+  // Edit existing form
+  const [editEmpId, setEditEmpId] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [foundRecord, setFoundRecord] = useState<AttendanceRecord | null>(null);
+  const [loadingRecord, setLoadingRecord] = useState(false);
+  const [editForm, setEditForm] = useState({ check_in_time: "", check_out_time: "", attendance_status: "present", is_wfh: false, notes: "" });
+
   const isAdmin = employee && (employee.role === "director" || employee.role === "ops_head" || employee.role === "team_lead");
+  const isHRAdmin = employee && (employee.role === "director" || employee.role === "hr_head");
 
   useEffect(() => {
     void fetchReport();
   }, [month, year, employee]);
+
+  useEffect(() => {
+    if (isHRAdmin && adminOpen && allEmployees.length === 0) {
+      api.get<{ data: EmployeeOption[] }>('/api/employees?is_active=1&limit=200')
+        .then(r => setAllEmployees((r.data as unknown as { data: EmployeeOption[] })?.data ?? (r.data as unknown as EmployeeOption[]) ?? []))
+        .catch(() => {});
+    }
+  }, [isHRAdmin, adminOpen]);
+
+  const handleManualSubmit = async () => {
+    if (!manualForm.employee_id || !manualForm.date) {
+      toast({ title: "Missing fields", description: "Employee and date are required.", variant: "destructive" }); return;
+    }
+    setOverrideSaving(true);
+    try {
+      await api.post('/api/attendance/manual', manualForm);
+      toast({ title: "Record created", description: `Attendance for ${manualForm.date} has been created.` });
+      setManualForm({ employee_id: "", date: "", check_in_time: "", check_out_time: "", attendance_status: "present", is_wfh: false, notes: "" });
+      void fetchReport();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to create record.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally { setOverrideSaving(false); }
+  };
+
+  const handleLoadRecord = async () => {
+    if (!editEmpId || !editDate) { toast({ title: "Select employee and date", variant: "destructive" }); return; }
+    setLoadingRecord(true); setFoundRecord(null);
+    try {
+      const d = new Date(editDate);
+      const res = await api.get<AttendanceRow[]>(`/api/attendance/report?date_from=${editDate}&date_to=${editDate}`);
+      const rows = (res.data as unknown as AttendanceRow[]) ?? [];
+      const match = rows.find(r => r.employee_id === editEmpId);
+      if (!match) { toast({ title: "No record found", description: "Use Create Manual Entry instead.", variant: "destructive" }); setLoadingRecord(false); return; }
+      const rec = match as unknown as AttendanceRecord;
+      setFoundRecord(rec);
+      setEditForm({
+        check_in_time: rec.check_in_time ? rec.check_in_time.slice(11, 16) : "",
+        check_out_time: rec.check_out_time ? rec.check_out_time.slice(11, 16) : "",
+        attendance_status: rec.attendance_status ?? "present",
+        is_wfh: !!rec.is_wfh,
+        notes: "",
+      });
+    } catch { toast({ title: "Error loading record", variant: "destructive" }); }
+    setLoadingRecord(false);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!foundRecord) return;
+    setOverrideSaving(true);
+    try {
+      await api.patch(`/api/attendance/${foundRecord.id}`, editForm);
+      toast({ title: "Record updated", description: `Attendance for ${editDate} has been updated.` });
+      setFoundRecord(null); setEditEmpId(""); setEditDate("");
+      void fetchReport();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to update record.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
+    } finally { setOverrideSaving(false); }
+  };
 
   const fetchReport = async () => {
     if (!employee) return;
@@ -525,6 +609,164 @@ export default function AttendanceReport() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Admin Override Panel (director / hr_head only) ── */}
+      {isHRAdmin && (
+        <Card className="border-amber-200 bg-amber-50/30">
+          <CardHeader
+            className="cursor-pointer select-none py-4"
+            onClick={() => setAdminOpen(o => !o)}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <WrenchIcon className="h-4 w-4 text-amber-600" />
+                <CardTitle className="text-sm font-semibold text-amber-800">Admin: Correct Attendance Record</CardTitle>
+                <Badge variant="outline" className="border-amber-300 text-amber-700 text-xs">HR Only</Badge>
+              </div>
+              {adminOpen ? <ChevronUp className="h-4 w-4 text-amber-600" /> : <ChevronDown className="h-4 w-4 text-amber-600" />}
+            </div>
+          </CardHeader>
+
+          {adminOpen && (
+            <CardContent className="pt-0">
+              <Tabs defaultValue="create">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="create">Create Manual Entry</TabsTrigger>
+                  <TabsTrigger value="edit">Edit Existing Record</TabsTrigger>
+                </TabsList>
+
+                {/* ── Tab A: Create Manual Entry ── */}
+                <TabsContent value="create">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Employee *</Label>
+                      <Select value={manualForm.employee_id} onValueChange={v => setManualForm(f => ({ ...f, employee_id: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Select employee…" /></SelectTrigger>
+                        <SelectContent>
+                          {allEmployees.map(e => (
+                            <SelectItem key={e.id} value={e.id}>{e.full_name} ({e.employee_code})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Date *</Label>
+                      <Input type="date" max={new Date().toISOString().slice(0,10)} value={manualForm.date} onChange={e => setManualForm(f => ({ ...f, date: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Check-in Time</Label>
+                      <Input type="time" value={manualForm.check_in_time} onChange={e => setManualForm(f => ({ ...f, check_in_time: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Check-out Time</Label>
+                      <Input type="time" value={manualForm.check_out_time} onChange={e => setManualForm(f => ({ ...f, check_out_time: e.target.value }))} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Status</Label>
+                      <Select value={manualForm.attendance_status} onValueChange={v => setManualForm(f => ({ ...f, attendance_status: v }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="present">Present</SelectItem>
+                          <SelectItem value="absent">Absent</SelectItem>
+                          <SelectItem value="half_day">Half Day</SelectItem>
+                          <SelectItem value="late">Late</SelectItem>
+                          <SelectItem value="wfh">WFH</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2 pt-6">
+                      <input type="checkbox" id="manual-wfh" checked={manualForm.is_wfh} onChange={e => setManualForm(f => ({ ...f, is_wfh: e.target.checked }))} className="h-4 w-4 rounded border" />
+                      <Label htmlFor="manual-wfh">Work From Home</Label>
+                    </div>
+                    <div className="space-y-1.5 col-span-full">
+                      <Label>Notes (visible to employee)</Label>
+                      <Textarea rows={2} placeholder="Reason for manual entry…" value={manualForm.notes} onChange={e => setManualForm(f => ({ ...f, notes: e.target.value }))} />
+                    </div>
+                    <div className="col-span-full flex justify-end">
+                      <Button onClick={handleManualSubmit} disabled={overrideSaving} className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700">
+                        {overrideSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Create Record
+                      </Button>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* ── Tab B: Edit Existing Record ── */}
+                <TabsContent value="edit">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label>Employee *</Label>
+                      <Select value={editEmpId} onValueChange={v => { setEditEmpId(v); setFoundRecord(null); }}>
+                        <SelectTrigger><SelectValue placeholder="Select employee…" /></SelectTrigger>
+                        <SelectContent>
+                          {allEmployees.map(e => (
+                            <SelectItem key={e.id} value={e.id}>{e.full_name} ({e.employee_code})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Date *</Label>
+                      <Input type="date" max={new Date().toISOString().slice(0,10)} value={editDate} onChange={e => { setEditDate(e.target.value); setFoundRecord(null); }} />
+                    </div>
+                    <div className="col-span-full">
+                      <Button variant="outline" onClick={handleLoadRecord} disabled={loadingRecord} className="w-full sm:w-auto">
+                        {loadingRecord && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Load Record
+                      </Button>
+                    </div>
+
+                    {foundRecord && (
+                      <>
+                        <div className="col-span-full">
+                          <p className="text-xs text-emerald-700 font-medium bg-emerald-50 border border-emerald-200 rounded px-3 py-1.5">
+                            ✓ Record found for {editDate}
+                          </p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Check-in Time</Label>
+                          <Input type="time" value={editForm.check_in_time} onChange={e => setEditForm(f => ({ ...f, check_in_time: e.target.value }))} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Check-out Time</Label>
+                          <Input type="time" value={editForm.check_out_time} onChange={e => setEditForm(f => ({ ...f, check_out_time: e.target.value }))} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Status</Label>
+                          <Select value={editForm.attendance_status} onValueChange={v => setEditForm(f => ({ ...f, attendance_status: v }))}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="present">Present</SelectItem>
+                              <SelectItem value="absent">Absent</SelectItem>
+                              <SelectItem value="half_day">Half Day</SelectItem>
+                              <SelectItem value="late">Late</SelectItem>
+                              <SelectItem value="wfh">WFH</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center gap-2 pt-6">
+                          <input type="checkbox" id="edit-wfh" checked={editForm.is_wfh} onChange={e => setEditForm(f => ({ ...f, is_wfh: e.target.checked }))} className="h-4 w-4 rounded border" />
+                          <Label htmlFor="edit-wfh">Work From Home</Label>
+                        </div>
+                        <div className="space-y-1.5 col-span-full">
+                          <Label>Notes (visible to employee)</Label>
+                          <Textarea rows={2} placeholder="Reason for correction…" value={editForm.notes} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))} />
+                        </div>
+                        <div className="col-span-full flex justify-end">
+                          <Button onClick={handleEditSubmit} disabled={overrideSaving} className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700">
+                            {overrideSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save Changes
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

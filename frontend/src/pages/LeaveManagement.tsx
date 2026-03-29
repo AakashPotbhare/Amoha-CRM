@@ -10,8 +10,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Plus, CheckCircle, XCircle } from "lucide-react";
+import { Plus, CheckCircle, XCircle, Pencil, Trash2 } from "lucide-react";
 import { format, differenceInCalendarDays, parseISO } from "date-fns";
 
 interface LeaveBalance {
@@ -79,11 +96,23 @@ export default function LeaveManagement() {
   const [pendingApprovals, setPendingApprovals] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Form state
+  // Apply form state
   const [leaveType, setLeaveType] = useState<string>("casual");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
+
+  // Edit dialog state
+  const [editTarget, setEditTarget] = useState<LeaveRequest | null>(null);
+  const [editLeaveType, setEditLeaveType] = useState<string>("casual");
+  const [editFromDate, setEditFromDate] = useState("");
+  const [editToDate, setEditToDate] = useState("");
+  const [editReason, setEditReason] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
+
+  // Withdraw confirmation state
+  const [withdrawTarget, setWithdrawTarget] = useState<LeaveRequest | null>(null);
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
 
   const APPROVER_ROLES = ["director", "ops_head", "hr_head", "sales_head", "technical_head", "marketing_tl", "resume_head", "assistant_tl"];
   const isApprover = employee && APPROVER_ROLES.includes(employee.role);
@@ -187,6 +216,73 @@ export default function LeaveManagement() {
     } catch (err: any) {
       toast({ title: "Failed", description: err.message, variant: "destructive" });
     }
+  };
+
+  // Open edit dialog and pre-populate fields
+  const openEditDialog = (r: LeaveRequest) => {
+    setEditTarget(r);
+    setEditLeaveType(r.leave_type);
+    setEditFromDate(r.start_date);
+    setEditToDate(r.end_date);
+    setEditReason(r.reason ?? "");
+  };
+
+  const closeEditDialog = () => {
+    setEditTarget(null);
+  };
+
+  const editTotalDays =
+    editFromDate && editToDate
+      ? Math.max(differenceInCalendarDays(new Date(editToDate), new Date(editFromDate)) + 1, 0)
+      : 0;
+
+  const handleEditSave = async () => {
+    if (!editTarget || !editFromDate || !editToDate || editTotalDays <= 0) return;
+    setEditLoading(true);
+    try {
+      const res = await api.patch(`/api/leaves/${editTarget.id}`, {
+        leave_type: editLeaveType,
+        from_date: editFromDate,
+        to_date: editToDate,
+        total_days: editTotalDays,
+        reason: editReason.trim() || null,
+      });
+      if ((res as any)?.success === false) {
+        throw new Error((res as any).error ?? "Failed to update");
+      }
+      toast({ title: "Leave request updated" });
+      closeEditDialog();
+      fetchData();
+    } catch (err: any) {
+      toast({ title: "Failed to update", description: err.message, variant: "destructive" });
+    }
+    setEditLoading(false);
+  };
+
+  // Withdraw (delete) pending leave
+  const openWithdrawDialog = (r: LeaveRequest) => {
+    setWithdrawTarget(r);
+  };
+
+  const closeWithdrawDialog = () => {
+    setWithdrawTarget(null);
+  };
+
+  const handleWithdrawConfirm = async () => {
+    if (!withdrawTarget) return;
+    setWithdrawLoading(true);
+    try {
+      const res = await api.delete(`/api/leaves/${withdrawTarget.id}`);
+      if ((res as any)?.success === false) {
+        throw new Error((res as any).error ?? "Failed to withdraw");
+      }
+      toast({ title: "Leave request withdrawn" });
+      closeWithdrawDialog();
+      fetchData();
+    } catch (err: any) {
+      toast({ title: "Failed to withdraw", description: err.message, variant: "destructive" });
+    }
+    setWithdrawLoading(false);
   };
 
   const statusBadge = (s: string) => {
@@ -298,12 +394,12 @@ export default function LeaveManagement() {
           </Card>
         </TabsContent>
 
-        {/* History Tab */}
+        {/* My Requests Tab */}
         <TabsContent value="history">
           <Card>
             <CardContent className="pt-4">
               <div className="overflow-x-auto rounded-lg border">
-              <Table className="min-w-[600px]">
+              <Table className="min-w-[680px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Type</TableHead>
@@ -311,12 +407,13 @@ export default function LeaveManagement() {
                     <TableHead>Days</TableHead>
                     <TableHead>Reason</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {myRequests.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground">No leave requests</TableCell>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">No leave requests</TableCell>
                     </TableRow>
                   ) : (
                     myRequests.map((r) => (
@@ -328,6 +425,30 @@ export default function LeaveManagement() {
                         <TableCell>{r.total_days}</TableCell>
                         <TableCell className="text-xs max-w-[200px] truncate">{r.reason || "—"}</TableCell>
                         <TableCell>{statusBadge(r.status)}</TableCell>
+                        <TableCell>
+                          {r.status === "pending" && (
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-blue-600 hover:text-blue-700"
+                                onClick={() => openEditDialog(r)}
+                              >
+                                <Pencil className="w-3.5 h-3.5 mr-1" />
+                                <span className="hidden sm:inline">Edit</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-destructive hover:text-destructive"
+                                onClick={() => openWithdrawDialog(r)}
+                              >
+                                <Trash2 className="w-3.5 h-3.5 mr-1" />
+                                <span className="hidden sm:inline">Withdraw</span>
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
@@ -396,6 +517,104 @@ export default function LeaveManagement() {
           </TabsContent>
         )}
       </Tabs>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editTarget} onOpenChange={(open) => { if (!open) closeEditDialog(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Leave Request</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Leave Type</Label>
+              <Select value={editLeaveType} onValueChange={setEditLeaveType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="casual">Casual Leave</SelectItem>
+                  <SelectItem value="paid">Paid Leave</SelectItem>
+                  <SelectItem value="sick">Sick Leave</SelectItem>
+                  <SelectItem value="unpaid">Unpaid Leave</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>From Date</Label>
+                <Input
+                  type="date"
+                  value={editFromDate}
+                  onChange={(e) => setEditFromDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label>To Date</Label>
+                <Input
+                  type="date"
+                  value={editToDate}
+                  onChange={(e) => setEditToDate(e.target.value)}
+                  min={editFromDate}
+                />
+              </div>
+            </div>
+            {editTotalDays > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Total: <strong>{editTotalDays} day{editTotalDays > 1 ? "s" : ""}</strong>
+              </p>
+            )}
+            <div>
+              <Label>Reason (optional)</Label>
+              <Textarea
+                value={editReason}
+                onChange={(e) => setEditReason(e.target.value)}
+                placeholder="Reason for leave..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeEditDialog} disabled={editLoading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleEditSave}
+              disabled={editLoading || !editFromDate || !editToDate || editTotalDays <= 0}
+            >
+              {editLoading ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw Confirmation Dialog */}
+      <AlertDialog open={!!withdrawTarget} onOpenChange={(open) => { if (!open) closeWithdrawDialog(); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Withdraw this leave request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {withdrawTarget && (
+                <>
+                  This will permanently remove your{" "}
+                  <strong className="capitalize">{withdrawTarget.leave_type}</strong> leave request
+                  from{" "}
+                  <strong>{format(parseISO(withdrawTarget.start_date), "dd MMM yyyy")}</strong> to{" "}
+                  <strong>{format(parseISO(withdrawTarget.end_date), "dd MMM yyyy")}</strong>.
+                  This action cannot be undone.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={withdrawLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleWithdrawConfirm}
+              disabled={withdrawLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {withdrawLoading ? "Withdrawing..." : "Yes, Withdraw"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Eye, FileText, Loader2, RefreshCcw, Search, Trash2, UploadCloud, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api.client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -145,6 +146,7 @@ const credentialFormOf = (candidate: Candidate): CredentialForm => ({
 export default function Candidates() {
   const { employee } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const role = employee?.role ?? "";
   const canDelete = role === "director" || role === "hr_head";
   const canEditProfile = PROFILE_EDIT_ROLES.includes(role);
@@ -356,7 +358,12 @@ export default function Candidates() {
                       <CardContent className="space-y-3 p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="font-semibold leading-tight">{candidate.full_name}</p>
+                            <button
+                              className="font-semibold leading-tight text-left hover:text-primary hover:underline transition-colors"
+                              onClick={() => navigate(`/candidates/${candidate.id}`)}
+                            >
+                              {candidate.full_name}
+                            </button>
                             <p className="mt-1 truncate text-xs text-muted-foreground">{candidate.current_domain || "Domain not added"}</p>
                           </div>
                           <Badge variant="outline">{candidate.completed_interview_count}/{candidate.interview_count}</Badge>

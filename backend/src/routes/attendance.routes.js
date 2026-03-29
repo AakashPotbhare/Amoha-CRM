@@ -13,4 +13,8 @@ router.get('/today',           c.today);
 router.get('/monthly',         c.monthly);
 router.get('/report',          requireRole(SENIOR_LEADERSHIP), c.report);
 
+// Admin override routes (director / hr_head only)
+router.post('/manual',         requireRole(['director','hr_head']), c.manualEntry);
+router.patch('/:id',           requireRole(['director','hr_head']), c.adminUpdate);
+
 module.exports = router;

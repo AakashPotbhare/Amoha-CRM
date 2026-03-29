@@ -1,6 +1,7 @@
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db');
 const { ok, created, notFound, badRequest, serverError } = require('../utils/response');
+const { createNotification } = require('../services/notification.service');
 
 // POST /api/attendance/check-in
 async function checkIn(req, res) {
@@ -305,4 +306,134 @@ async function report(req, res) {
   }
 }
 
-module.exports = { checkIn, checkOut, undoCheckout, startBreak, endBreak, today, monthly, report };
+// POST /api/attendance/manual  (director / hr_head only)
+async function manualEntry(req, res) {
+  try {
+    const { employee_id, date, check_in_time, check_out_time, is_wfh, attendance_status, notes } = req.body;
+
+    if (!employee_id || !date) return badRequest(res, 'employee_id and date are required');
+
+    // Cannot create future records
+    const today = new Date().toISOString().slice(0, 10);
+    if (date > today) return badRequest(res, 'Cannot create attendance records for future dates');
+
+    // Validate employee exists
+    const [[emp]] = await db.query('SELECT id, full_name FROM employees WHERE id = ? AND is_active = 1', [employee_id]);
+    if (!emp) return notFound(res, 'Employee not found');
+
+    // Check for duplicate
+    const [[existing]] = await db.query(
+      'SELECT id FROM attendance_records WHERE employee_id = ? AND date = ?',
+      [employee_id, date]
+    );
+    if (existing) return res.status(409).json({ success: false, error: 'Attendance record already exists for this employee on that date. Use the Edit endpoint instead.' });
+
+    // Calculate total_hours if both times provided
+    let total_hours = null;
+    if (check_in_time && check_out_time) {
+      const checkIn  = new Date(`${date}T${check_in_time}`);
+      const checkOut = new Date(`${date}T${check_out_time}`);
+      if (checkOut > checkIn) {
+        total_hours = (checkOut - checkIn) / (1000 * 60 * 60);
+      }
+    }
+
+    const id = uuidv4();
+    const status = attendance_status || (check_in_time ? 'present' : 'absent');
+
+    await db.query(
+      `INSERT INTO attendance_records
+         (id, employee_id, date, check_in_time, check_out_time, is_wfh, attendance_status, total_hours)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, employee_id, date,
+        check_in_time  ? `${date} ${check_in_time}`  : null,
+        check_out_time ? `${date} ${check_out_time}` : null,
+        is_wfh ? 1 : 0,
+        status,
+        total_hours
+      ]
+    );
+
+    // Notify the employee
+    const adminName = req.employee.full_name;
+    await createNotification({
+      employee_id,
+      title: 'Attendance Record Created by HR',
+      body: `Your attendance for ${date} was manually recorded by ${adminName}${notes ? `: ${notes}` : ''}`,
+      type: 'info',
+      entity_type: 'attendance',
+      entity_id: id,
+    });
+
+    const [[record]] = await db.query('SELECT * FROM attendance_records WHERE id = ?', [id]);
+    return created(res, record);
+  } catch (err) {
+    return serverError(res, err);
+  }
+}
+
+// PATCH /api/attendance/:id  (director / hr_head only)
+async function adminUpdate(req, res) {
+  try {
+    const { id } = req.params;
+
+    const [[record]] = await db.query(
+      `SELECT ar.*, e.full_name AS employee_name, e.id AS emp_id
+       FROM attendance_records ar
+       JOIN employees e ON ar.employee_id = e.id
+       WHERE ar.id = ?`,
+      [id]
+    );
+    if (!record) return notFound(res, 'Attendance record not found');
+
+    const allowed = ['check_in_time', 'check_out_time', 'is_wfh', 'attendance_status'];
+    const fields = [];
+    const params = [];
+
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        fields.push(`${key} = ?`);
+        params.push(req.body[key]);
+      }
+    }
+
+    // Recalculate total_hours if either time is being updated
+    const newCheckIn  = req.body.check_in_time  !== undefined ? `${record.date} ${req.body.check_in_time}`  : record.check_in_time;
+    const newCheckOut = req.body.check_out_time !== undefined ? `${record.date} ${req.body.check_out_time}` : record.check_out_time;
+
+    if (newCheckIn && newCheckOut) {
+      const ci = new Date(newCheckIn);
+      const co = new Date(newCheckOut);
+      if (co > ci) {
+        const hours = (co - ci) / (1000 * 60 * 60);
+        fields.push('total_hours = ?');
+        params.push(Math.round(hours * 100) / 100);
+      }
+    }
+
+    if (fields.length === 0) return badRequest(res, 'No valid fields to update');
+
+    params.push(id);
+    await db.query(`UPDATE attendance_records SET ${fields.join(', ')} WHERE id = ?`, params);
+
+    // Notify the employee
+    const adminName = req.employee.full_name;
+    const notes = req.body.notes || '';
+    await createNotification({
+      employee_id: record.emp_id,
+      title: 'Attendance Record Updated by HR',
+      body: `Your attendance record for ${record.date} was updated by ${adminName}${notes ? `: ${notes}` : ''}`,
+      type: 'info',
+      entity_type: 'attendance',
+      entity_id: id,
+    });
+
+    const [[updated]] = await db.query('SELECT * FROM attendance_records WHERE id = ?', [id]);
+    return ok(res, updated);
+  } catch (err) {
+    return serverError(res, err);
+  }
+}
+
+module.exports = { checkIn, checkOut, undoCheckout, startBreak, endBreak, today, monthly, report, manualEntry, adminUpdate };
