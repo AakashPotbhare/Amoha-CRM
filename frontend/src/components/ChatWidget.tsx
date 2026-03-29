@@ -180,13 +180,19 @@ export default function ChatWidget() {
         )}
       </button>
 
-      {/* Chat panel */}
+      {/* Chat panel
+          Mobile:  fixed inset-x-2 bottom-[88px] top-16  (nearly full screen, above FAB)
+          Desktop: fixed bottom-6 right-6 w-[380px] h-[560px] (original small panel)
+      */}
       <div
-        className={`fixed bottom-6 right-6 z-50 w-[380px] h-[560px] bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 origin-bottom-right ${
-          isOpen
-            ? 'scale-100 opacity-100 translate-y-0'
-            : 'scale-75 opacity-0 translate-y-4 pointer-events-none'
-        }`}
+        className={`fixed z-50 bg-card border border-border shadow-2xl flex flex-col overflow-hidden transition-all duration-300
+          inset-x-2 bottom-[88px] top-16 rounded-2xl
+          md:inset-auto md:bottom-6 md:right-6 md:w-[380px] md:h-[560px] md:rounded-2xl md:origin-bottom-right
+          ${
+            isOpen
+              ? 'scale-100 opacity-100 translate-y-0'
+              : 'scale-75 opacity-0 translate-y-4 pointer-events-none'
+          }`}
       >
         {/* ===== HEADER ===== */}
         <div className="flex items-center justify-between px-4 py-3 bg-primary text-primary-foreground shrink-0">
@@ -390,9 +396,9 @@ export default function ChatWidget() {
         {/* ===== CHAT VIEW ===== */}
         {view === 'chat' && (
           <>
-            {/* Messages area — fixed width, no overflow */}
-            <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ width: '380px' }}>
-              <div className="py-3 flex flex-col" style={{ padding: '12px 16px' }}>
+            {/* Messages area — fills available height, x-overflow hidden */}
+            <div className="flex-1 overflow-y-auto overflow-x-hidden">
+              <div style={{ padding: '12px 16px' }} className="flex flex-col">
                 {loading && messages.length === 0 ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -410,10 +416,8 @@ export default function ChatWidget() {
                       format(new Date(messages[i - 1].created_at), 'yyyy-MM-dd') !==
                         format(new Date(msg.created_at), 'yyyy-MM-dd');
 
-                    // Panel is 380px, padding 16px each side = 348px content
-                    // Bubble max = 70% of 348 = ~243px
                     const bubbleStyle: React.CSSProperties = {
-                      maxWidth: '243px',
+                      maxWidth: '70%',
                       wordBreak: 'break-word',
                       overflowWrap: 'break-word',
                     };
@@ -534,8 +538,8 @@ export default function ChatWidget() {
               </div>
             </div>
 
-            {/* Message input area */}
-            <div className="px-3 py-2.5 border-t border-border bg-card shrink-0">
+            {/* Message input area — extra bottom padding so virtual keyboard doesn't cover it */}
+            <div className="px-3 py-2.5 pb-[max(10px,env(safe-area-inset-bottom,10px))] border-t border-border bg-card shrink-0">
               {/* Character counter */}
               {messageText.length >= CHAR_WARN_THRESHOLD && (
                 <div className="flex justify-end mb-1 px-1">

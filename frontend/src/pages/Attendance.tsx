@@ -17,6 +17,7 @@ interface OfficeLocation {
   latitude: number;
   longitude: number;
   radius_meters: number;
+  is_active: boolean;
 }
 
 interface ShiftSetting {
@@ -27,6 +28,7 @@ interface ShiftSetting {
   grace_period_minutes: number;
   required_hours: number;
   max_late_per_month: number;
+  is_active: boolean;
 }
 
 interface AttendanceRecord {
@@ -168,10 +170,12 @@ export default function Attendance() {
         api.get<ShiftSetting[]>("/api/hr/shifts"),
       ]);
 
-      if (locRes.success && locRes.data) setLocations(locRes.data);
+      if (locRes.success && locRes.data) {
+        setLocations(locRes.data.filter((loc: OfficeLocation) => loc.is_active));
+      }
       if (shiftsRes.success && shiftsRes.data) {
         const active = shiftsRes.data.find((s: any) => s.is_active);
-        if (active) setShift(active);
+        setShift(active || null);
       }
 
       if (todayRes.success && todayRes.data) {
@@ -416,8 +420,8 @@ export default function Attendance() {
   const weekHeaders = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-foreground">Attendance</h1>
+    <div className="p-3 md:p-6 space-y-6 max-w-5xl mx-auto">
+      <h1 className="text-xl md:text-2xl font-bold text-foreground">Attendance</h1>
 
       {/* Geo status */}
       {geoError && (
@@ -445,11 +449,11 @@ export default function Attendance() {
         </CardHeader>
         <CardContent className="space-y-4">
           {!todayRecord ? (
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={() => handleCheckIn(false)} disabled={loading || !currentPos || !shift} className="gap-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Button onClick={() => handleCheckIn(false)} disabled={loading || !currentPos || !shift} className="gap-2 w-full sm:w-auto">
                 <LogIn className="w-4 h-4" /> Check In (Office)
               </Button>
-              <Button onClick={() => handleCheckIn(true)} disabled={loading || !shift} variant="outline" className="gap-2">
+              <Button onClick={() => handleCheckIn(true)} disabled={loading || !shift} variant="outline" className="gap-2 w-full sm:w-auto">
                 <Home className="w-4 h-4" /> Check In (WFH)
               </Button>
             </div>
@@ -539,36 +543,38 @@ export default function Attendance() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-7 gap-1">
-            {weekHeaders.map((d) => (
-              <div key={d} className="text-center text-xs font-semibold text-muted-foreground py-1">{d}</div>
-            ))}
-            {calendarDays.map((day) => {
-              const inMonth = isSameMonth(day.date, new Date(calendarYear, calendarMonth - 1, 1));
-              const selected = selectedCalendarDate ? isSameDay(day.date, selectedCalendarDate) : false;
-              const style = CALENDAR_STATUS_STYLES[day.status];
-              return (
-                <button
-                  key={day.date.toISOString()}
-                  type="button"
-                  onClick={() => setSelectedCalendarDate(day.date)}
-                  className={cn(
-                    "min-h-[72px] rounded-xl border p-1.5 text-left text-xs transition-colors",
-                    style,
-                    !inMonth && "opacity-30",
-                    selected && "ring-2 ring-primary ring-offset-1",
-                    isToday(day.date) && inMonth && "shadow-[inset_0_0_0_1px_hsl(var(--primary))]",
-                  )}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-semibold">{format(day.date, "d")}</span>
-                    {isToday(day.date) && inMonth && <Badge variant="secondary" className="px-1 py-0 text-[9px]">Today</Badge>}
-                  </div>
-                  <span className="font-medium">{CALENDAR_STATUS_SHORT[day.status]}</span>
-                  {day.totalHours != null && <p className="text-[10px] opacity-80">{Number(day.totalHours).toFixed(1)}h</p>}
-                </button>
-              );
-            })}
+          <div className="overflow-x-auto">
+            <div className="grid grid-cols-7 gap-1 min-w-[320px]">
+              {weekHeaders.map((d) => (
+                <div key={d} className="text-center text-xs font-semibold text-muted-foreground py-1">{d}</div>
+              ))}
+              {calendarDays.map((day) => {
+                const inMonth = isSameMonth(day.date, new Date(calendarYear, calendarMonth - 1, 1));
+                const selected = selectedCalendarDate ? isSameDay(day.date, selectedCalendarDate) : false;
+                const style = CALENDAR_STATUS_STYLES[day.status];
+                return (
+                  <button
+                    key={day.date.toISOString()}
+                    type="button"
+                    onClick={() => setSelectedCalendarDate(day.date)}
+                    className={cn(
+                      "min-h-[56px] md:min-h-[72px] rounded-xl border p-1 md:p-1.5 text-left transition-colors",
+                      style,
+                      !inMonth && "opacity-30",
+                      selected && "ring-2 ring-primary ring-offset-1",
+                      isToday(day.date) && inMonth && "shadow-[inset_0_0_0_1px_hsl(var(--primary))]",
+                    )}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-semibold">{format(day.date, "d")}</span>
+                      {isToday(day.date) && inMonth && <Badge variant="secondary" className="hidden sm:inline-flex px-1 py-0 text-[9px]">Today</Badge>}
+                    </div>
+                    <span className="text-xs font-medium">{CALENDAR_STATUS_SHORT[day.status]}</span>
+                    {day.totalHours != null && <p className="hidden sm:block text-[10px] opacity-80">{Number(day.totalHours).toFixed(1)}h</p>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {focusedDay && (
@@ -588,7 +594,8 @@ export default function Attendance() {
           <CardTitle className="text-sm font-medium">Recent Attendance</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto rounded-lg border">
+          <Table className="min-w-[700px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
@@ -629,6 +636,7 @@ export default function Attendance() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

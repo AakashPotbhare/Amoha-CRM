@@ -63,19 +63,24 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Overview Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Live candidate pipeline across all departments
+    <div className="p-3 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8">
+      {/* Header — stack on mobile, row on sm+ */}
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground">Overview Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Live candidate pipeline across all departments
+          </p>
+        </div>
+        <p className="text-xs text-muted-foreground sm:text-right">
+          {format(new Date(), "EEEE, MMM d, yyyy")}
         </p>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         {kpis.map((kpi) => (
-          <div key={kpi.label} className="bg-card rounded-lg border border-border p-5 flex items-center gap-4">
+          <div key={kpi.label} className="bg-card rounded-lg border border-border p-3 md:p-5 flex items-center gap-4">
             <div className={`flex items-center justify-center w-12 h-12 rounded-full ${kpi.bg}`}>
               <kpi.icon className={`w-6 h-6 ${kpi.color}`} />
             </div>
@@ -87,57 +92,59 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Pipeline Funnel */}
-      <div className="bg-card rounded-lg border border-border p-5">
+      {/* Pipeline Funnel — horizontal scroll wrapper on mobile */}
+      <div className="bg-card rounded-lg border border-border p-3 md:p-5">
         <h2 className="text-sm font-semibold text-card-foreground mb-5">Candidate Pipeline</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {PIPELINE_STAGES.map((stage) => {
-            const count = stats?.[stage.key] ?? 0;
-            const pct = stats?.total ? Math.round((count / stats.total) * 100) : 0;
-            return (
-              <div key={stage.key} className="bg-secondary rounded-lg p-4 text-center space-y-1">
-                <div className={`h-1.5 rounded-full ${stage.color} mb-3`} style={{ width: `${pct}%`, minWidth: count > 0 ? "8px" : "0" }} />
-                <p className="text-2xl font-bold text-foreground">{count}</p>
-                <p className="text-xs font-medium text-foreground">{stage.label}</p>
-                <p className="text-[10px] text-muted-foreground">{pct}%</p>
-              </div>
-            );
-          })}
+        <div className="overflow-x-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 min-w-[320px]">
+            {PIPELINE_STAGES.map((stage) => {
+              const count = stats?.[stage.key] ?? 0;
+              const pct = stats?.total ? Math.round((count / stats.total) * 100) : 0;
+              return (
+                <div key={stage.key} className="bg-secondary rounded-lg p-4 text-center space-y-1">
+                  <div className={`h-1.5 rounded-full ${stage.color} mb-3`} style={{ width: `${pct}%`, minWidth: count > 0 ? "8px" : "0" }} />
+                  <p className="text-2xl font-bold text-foreground">{count}</p>
+                  <p className="text-xs font-medium text-foreground">{stage.label}</p>
+                  <p className="text-[10px] text-muted-foreground">{pct}%</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Recent Candidates */}
       <div className="bg-card rounded-lg border border-border">
-        <div className="p-5 border-b border-border flex items-center justify-between">
+        <div className="p-3 md:p-5 border-b border-border flex items-center justify-between">
           <h2 className="text-sm font-semibold text-card-foreground">Recently Enrolled</h2>
           {recentLoading && <span className="text-xs text-muted-foreground">Loading...</span>}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div className="overflow-x-auto rounded-b-lg">
+          <table className="w-full min-w-[600px]">
             <thead>
               <tr className="border-b border-border text-left">
-                <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Candidate</th>
-                <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Technology</th>
-                <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Visa</th>
-                <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Pipeline Stage</th>
-                <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Enrolled</th>
+                <th className="px-3 md:px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Candidate</th>
+                <th className="px-3 md:px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Technology</th>
+                <th className="px-3 md:px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Visa</th>
+                <th className="px-3 md:px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Pipeline Stage</th>
+                <th className="px-3 md:px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Enrolled</th>
               </tr>
             </thead>
             <tbody>
               {(recentData?.data ?? []).map((c) => (
                 <tr key={c.id} className="border-b border-border last:border-0 hover:bg-secondary/50 transition-colors">
-                  <td className="px-5 py-3">
+                  <td className="px-3 md:px-5 py-3">
                     <p className="text-sm font-medium text-foreground">{c.full_name}</p>
                     <p className="text-xs text-muted-foreground">{c.email}</p>
                   </td>
-                  <td className="px-5 py-3 text-sm text-foreground">{c.technology ?? "—"}</td>
-                  <td className="px-5 py-3 text-sm text-foreground">{c.visa_status?.toUpperCase() ?? "—"}</td>
-                  <td className="px-5 py-3">
+                  <td className="px-3 md:px-5 py-3 text-sm text-foreground">{c.technology ?? "—"}</td>
+                  <td className="px-3 md:px-5 py-3 text-sm text-foreground">{c.visa_status?.toUpperCase() ?? "—"}</td>
+                  <td className="px-3 md:px-5 py-3">
                     <span className="text-xs px-2 py-1 rounded-full bg-secondary text-foreground capitalize">
                       {c.pipeline_stage?.replace("_", " ") ?? "enrolled"}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-sm text-muted-foreground">
+                  <td className="px-3 md:px-5 py-3 text-sm text-muted-foreground">
                     {c.created_at ? format(new Date(c.created_at), "MMM d, yyyy") : "—"}
                   </td>
                 </tr>

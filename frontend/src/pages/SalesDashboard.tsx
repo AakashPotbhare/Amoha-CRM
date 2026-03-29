@@ -23,6 +23,8 @@ interface CandidateRow {
   pipeline_stage: string;
   created_at: string;
   enrolled_by_name: string | null;
+  plan_price?: number | null;
+  discount_amount?: number | null;
 }
 
 interface HistoryTask {
@@ -88,6 +90,9 @@ const CALL_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   completed:   { label: "Completed",    color: "bg-success/10 text-success" },
 };
 
+const fmtUSD = (value: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+
 // ─── Candidate History Modal ──────────────────────────────────────────────────
 function CandidateHistoryModal({
   candidateId,
@@ -126,7 +131,7 @@ function CandidateHistoryModal({
       />
 
       {/* Slide-over panel */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xl flex flex-col bg-background border-l border-border shadow-2xl">
+      <div className="fixed inset-y-0 right-0 z-50 w-full sm:max-w-xl flex flex-col bg-background border-l border-border shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
@@ -155,7 +160,7 @@ function CandidateHistoryModal({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+        <div className="flex-1 overflow-y-auto max-h-[80vh] px-4 md:px-6 py-5 space-y-4">
           {loading && (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
@@ -299,15 +304,18 @@ export default function SalesDashboard() {
     });
   }, [candidates, stageFilter, search]);
 
+  const netAmount = (candidate: CandidateRow) =>
+    Math.max(Number(candidate.plan_price || 0) - Number(candidate.discount_amount || 0), 0);
   const totalCandidates = candidates.length;
-  const activeCandidates = candidates.filter(
-    (c) => c.pipeline_stage !== "placed" && c.pipeline_stage !== "rejected"
-  ).length;
-  const thisMonthCount = candidates.filter((c) => {
+  const totalRevenue = candidates.reduce((sum, candidate) => sum + netAmount(candidate), 0);
+  const activeRevenue = candidates
+    .filter((c) => c.pipeline_stage !== "placed" && c.pipeline_stage !== "rejected")
+    .reduce((sum, candidate) => sum + netAmount(candidate), 0);
+  const thisMonthRevenue = candidates.filter((c) => {
     const d = new Date(c.created_at);
     const now = new Date();
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  }).length;
+  }).reduce((sum, candidate) => sum + netAmount(candidate), 0);
 
   const selectClass = "border border-input rounded-md px-3 py-1.5 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
@@ -321,57 +329,61 @@ export default function SalesDashboard() {
 
   return (
     <>
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="p-3 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Sales Dashboard</h1>
-            <p className="text-sm text-muted-foreground mt-1">Manage candidates and enrollments</p>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">Sales Dashboard</h1>
+            <p className="text-sm text-muted-foreground">Manage candidates and enrollments</p>
           </div>
-          <Button onClick={() => navigate("/candidates/enroll")}>
-            <UserPlus className="w-4 h-4 mr-2" /> Enroll Candidate
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={() => navigate("/candidates/enroll")}>
+              <UserPlus className="w-4 h-4 mr-2" /> Enroll Candidate
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="performance">Team Performance</TabsTrigger>
-          </TabsList>
+          <div className="overflow-x-auto pb-1">
+            <TabsList className="flex w-max min-w-full">
+              <TabsTrigger className="whitespace-nowrap" value="overview">Overview</TabsTrigger>
+              <TabsTrigger className="whitespace-nowrap" value="performance">Team Performance</TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="overview" className="space-y-6">
             {/* KPIs */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              <div className="bg-card rounded-lg border border-border p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
+              <div className="bg-card rounded-lg border border-border p-3 md:p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <Users className="w-4 h-4 text-primary" />
-                  <span className="text-xs font-medium text-muted-foreground">Total Candidates</span>
+                  <span className="text-xs font-medium text-muted-foreground">Total Revenue</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground">{totalCandidates}</p>
+                <p className="text-2xl font-bold text-foreground">{fmtUSD(totalRevenue)}</p>
               </div>
-              <div className="bg-card rounded-lg border border-border p-4">
+              <div className="bg-card rounded-lg border border-border p-3 md:p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp className="w-4 h-4 text-success" />
-                  <span className="text-xs font-medium text-muted-foreground">Active</span>
+                  <span className="text-xs font-medium text-muted-foreground">Active Pipeline Value</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground">{activeCandidates}</p>
+                <p className="text-2xl font-bold text-foreground">{fmtUSD(activeRevenue)}</p>
               </div>
-              <div className="bg-card rounded-lg border border-border p-4">
+              <div className="bg-card rounded-lg border border-border p-3 md:p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <Calendar className="w-4 h-4 text-info" />
-                  <span className="text-xs font-medium text-muted-foreground">This Month</span>
+                  <span className="text-xs font-medium text-muted-foreground">This Month Revenue</span>
                 </div>
-                <p className="text-2xl font-bold text-foreground">{thisMonthCount}</p>
+                <p className="text-2xl font-bold text-foreground">{fmtUSD(thisMonthRevenue)}</p>
               </div>
             </div>
 
             {/* Filters */}
-            <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center flex-wrap">
               <input
                 type="text"
                 placeholder="Search name, email, phone..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="border border-input rounded-md px-3 py-1.5 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring w-64"
+                className="border border-input rounded-md px-3 py-1.5 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring w-full sm:w-64"
               />
               <select
                 value={stageFilter}
@@ -393,19 +405,20 @@ export default function SalesDashboard() {
 
             {/* Candidates Table */}
             <div className="bg-card rounded-lg border border-border">
-              <div className="p-4 border-b border-border">
+              <div className="p-3 md:p-6 border-b border-border">
                 <h2 className="text-sm font-semibold text-card-foreground flex items-center gap-2">
                   <Users className="w-4 h-4 text-primary" />
                   Candidates — click a row for interview history
                 </h2>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
+              <div className="overflow-x-auto rounded-b-lg">
+                <table className="w-full min-w-[750px]">
                   <thead>
                     <tr className="border-b border-border text-left">
                       <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Candidate</th>
                       <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Domain</th>
                       <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Enrolled By</th>
+                      <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Net Value</th>
                       <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Stage</th>
                       <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase">Added</th>
                       <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase"></th>
@@ -424,6 +437,7 @@ export default function SalesDashboard() {
                         </td>
                         <td className="px-5 py-3 text-sm text-foreground">{c.profession || "—"}</td>
                         <td className="px-5 py-3 text-sm text-muted-foreground">{c.enrolled_by_name || "—"}</td>
+                        <td className="px-5 py-3 text-sm font-medium text-foreground">{fmtUSD(netAmount(c))}</td>
                         <td className="px-5 py-3">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STAGE_COLORS[c.pipeline_stage] ?? "bg-muted text-muted-foreground"}`}>
                             {c.pipeline_stage.replace(/_/g, " ")}
@@ -439,7 +453,7 @@ export default function SalesDashboard() {
                     ))}
                     {filtered.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-5 py-10 text-center text-muted-foreground text-sm">
+                        <td colSpan={7} className="px-5 py-10 text-center text-muted-foreground text-sm">
                           No candidates match the current filters.
                         </td>
                       </tr>

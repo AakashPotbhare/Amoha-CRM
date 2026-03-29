@@ -173,10 +173,12 @@ export default function CreatePlacementOffer() {
   const selectClass = "w-full border border-input rounded-md px-3 py-2 text-sm bg-background text-foreground";
 
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">New Placement Offer</h1>
-        <p className="text-sm text-muted-foreground mt-1">Fill in the offer details — the compliance team will be notified automatically.</p>
+    <div className="p-4 md:p-6 lg:p-8 max-w-3xl mx-auto space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">New Placement Offer</h1>
+          <p className="text-sm text-muted-foreground mt-1">Fill in the offer details — the compliance team will be notified automatically.</p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -263,11 +265,11 @@ export default function CreatePlacementOffer() {
           <h2 className="text-base font-semibold text-foreground">Financial Details</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Annual Package (₹) *</Label>
+              <Label>Annual Package ($) *</Label>
               <Input type="number" value={annualPackage} onChange={e => setAnnualPackage(e.target.value)} placeholder="e.g. 1200000" required />
             </div>
             <div className="space-y-2">
-              <Label>Upfront Received (₹)</Label>
+              <Label>Upfront Received ($)</Label>
               <Input type="number" value={upfrontPaid} onChange={e => setUpfrontPaid(e.target.value)} placeholder="0" />
             </div>
             <div className="space-y-2">
@@ -275,11 +277,11 @@ export default function CreatePlacementOffer() {
               <Input type="number" step="0.01" value={commissionRate} onChange={e => setCommissionRate(e.target.value)} placeholder="e.g. 8.33" />
             </div>
             <div className="space-y-2">
-              <Label>Commission Amount (₹) *</Label>
+              <Label>Commission Amount ($) *</Label>
               <Input type="number" value={commissionAmt} onChange={e => setCommissionAmt(e.target.value)} placeholder="Auto-calculated or enter manually" required />
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label>Final Amount Due (₹) *</Label>
+              <Label>Final Amount Due ($) *</Label>
               <Input type="number" value={finalAmtDue} onChange={e => setFinalAmtDue(e.target.value)} placeholder="Commission - Upfront" required />
               <p className="text-xs text-muted-foreground">Auto-calculated as Commission − Upfront Paid</p>
             </div>
@@ -308,7 +310,7 @@ export default function CreatePlacementOffer() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Amount (₹)</Label>
+                  <Label className="text-xs">Amount ($)</Label>
                   <Input
                     type="number"
                     value={inst.amount}
@@ -358,11 +360,11 @@ export default function CreatePlacementOffer() {
         </section>
 
         {/* Submit */}
-        <div className="flex gap-3">
-          <Button type="submit" disabled={loading} className="gap-2">
+        <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-4">
+          <Button type="button" variant="outline" onClick={() => navigate("/placement-orders")} className="w-full sm:w-auto">Cancel</Button>
+          <Button type="submit" disabled={loading} className="gap-2 w-full sm:w-auto">
             {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Submitting…</> : "Submit Placement Offer"}
           </Button>
-          <Button type="button" variant="outline" onClick={() => navigate("/placement-orders")}>Cancel</Button>
         </div>
       </form>
     </div>

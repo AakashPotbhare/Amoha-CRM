@@ -248,12 +248,14 @@ export default function MySupportQueue() {
   const completedTasks = tasks.filter((t) => t.status === "completed");
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">My Support Queue</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Tasks assigned to you — add Teams links and submit post-call feedback
-        </p>
+    <div className="p-3 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">My Support Queue</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Tasks assigned to you — add Teams links and submit post-call feedback
+          </p>
+        </div>
       </div>
 
       {/* Active Tasks */}
@@ -266,7 +268,8 @@ export default function MySupportQueue() {
             <p className="text-muted-foreground">No active tasks in your queue</p>
           </div>
         ) : (
-          activeTasks.map((task) => {
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {activeTasks.map((task) => {
             const isExpanded = expandedTask === task.id;
             const cs = CALL_STATUS_CONFIG[task.call_status] || CALL_STATUS_CONFIG.not_started;
 
@@ -369,7 +372,7 @@ export default function MySupportQueue() {
                         <Link2 className="w-3 h-3 inline mr-1" />
                         Microsoft Teams Link
                       </label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
                         <input
                           type="url"
                           placeholder="Paste Teams meeting link here..."
@@ -383,6 +386,7 @@ export default function MySupportQueue() {
                             size="sm"
                             onClick={() => handleSendTeamsLink(task.id)}
                             disabled={saving === task.id}
+                            className="w-full sm:w-auto"
                           >
                             {saving === task.id ? <Loader2 className="w-4 h-4 animate-spin" /> : "Send Link"}
                           </Button>
@@ -435,11 +439,11 @@ export default function MySupportQueue() {
                         </div>
 
                         {task.call_status !== "completed" && (
-                          <div className="flex gap-2 pt-2">
+                          <div className="flex flex-wrap gap-2 pt-2">
                             <Button
                               onClick={() => handleSubmitFeedback(task.id, "completed")}
                               disabled={saving === task.id}
-                              className="bg-success hover:bg-success/90 text-success-foreground"
+                              className="bg-success hover:bg-success/90 text-success-foreground w-full sm:w-auto"
                             >
                               {saving === task.id ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <CheckCircle className="w-4 h-4 mr-1" />}
                               Call Completed
@@ -448,6 +452,7 @@ export default function MySupportQueue() {
                               variant="outline"
                               onClick={() => handleSubmitFeedback(task.id, "no_show")}
                               disabled={saving === task.id}
+                              className="w-full sm:w-auto"
                             >
                               <XCircle className="w-4 h-4 mr-1" />
                               No Show
@@ -456,6 +461,7 @@ export default function MySupportQueue() {
                               variant="outline"
                               onClick={() => handleSubmitFeedback(task.id, "cancelled")}
                               disabled={saving === task.id}
+                              className="w-full sm:w-auto"
                             >
                               Cancelled
                             </Button>
@@ -467,7 +473,8 @@ export default function MySupportQueue() {
                 )}
               </div>
             );
-          })
+          })}
+          </div>
         )}
       </div>
 
@@ -477,6 +484,7 @@ export default function MySupportQueue() {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             Completed ({completedTasks.length})
           </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {completedTasks.map((task) => {
             const isExpanded = expandedTask === task.id;
             return (
@@ -544,6 +552,7 @@ export default function MySupportQueue() {
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </div>

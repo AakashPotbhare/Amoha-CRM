@@ -30,6 +30,13 @@ export interface ChatMessage {
   created_at: string;
 }
 
+function resolveAvatarUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+  return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 export function useChat() {
   const { employee } = useAuth();
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
@@ -67,7 +74,11 @@ export function useChat() {
     try {
       const res = await api.get<any[]>('/api/employees?is_active=true');
       if (res.success && res.data) {
-        setEmployees(res.data.filter((e: any) => e.id !== employee.id));
+        setEmployees(
+          res.data
+            .filter((e: any) => e.id !== employee.id)
+            .map((e: any) => ({ ...e, avatar_url: resolveAvatarUrl(e.avatar_url ?? null) }))
+        );
       }
     } catch {
       // ignore
@@ -88,7 +99,15 @@ export function useChat() {
       if (!raw.ok || !json.success) return;
 
       const convos: ChatConversation[] = Array.isArray(json.data) ? json.data : [];
-      setConversations(convos);
+      setConversations(
+        convos.map(convo => ({
+          ...convo,
+          other_employee: {
+            ...convo.other_employee,
+            avatar_url: resolveAvatarUrl(convo.other_employee.avatar_url),
+          },
+        }))
+      );
 
       const newUnread = json.total_unread ?? 0;
       setTotalUnread(newUnread);

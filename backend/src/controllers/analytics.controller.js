@@ -270,6 +270,57 @@ exports.departmentSummary = async (req, res) => {
       [dept.id]
     );
 
+    if (slug === 'sales') {
+      const [enrollments] = await db.query(
+        `SELECT ce.salesperson_employee_id,
+                ce.pipeline_stage,
+                COALESCE(ce.plan_price, 0)      AS plan_price,
+                COALESCE(ce.discount_amount, 0) AS discount_amount
+         FROM candidate_enrollments ce
+         WHERE DATE(ce.created_at) BETWEEN ? AND ?
+           AND ce.salesperson_employee_id IS NOT NULL`,
+        [from, to]
+      );
+
+      const employees = emps.map(emp => {
+        const empEnrollments = enrollments.filter(e => e.salesperson_employee_id === emp.id);
+        const revenue = empEnrollments.reduce((sum, e) => sum + Math.max(Number(e.plan_price || 0) - Number(e.discount_amount || 0), 0), 0);
+        const enrolled = empEnrollments.length;
+        const active = empEnrollments.filter(e => !['placed', 'rejected'].includes(e.pipeline_stage)).length;
+        const placed = empEnrollments.filter(e => e.pipeline_stage === 'placed').length;
+
+        return {
+          ...emp,
+          total: enrolled,
+          completed: placed,
+          no_show: 0,
+          completion_rate: enrolled > 0 ? Math.round((placed / enrolled) * 1000) / 10 : 0,
+          by_type: {},
+          revenue,
+          active,
+          placed,
+        };
+      });
+
+      const totalRevenue = employees.reduce((sum, emp) => sum + Number(emp.revenue || 0), 0);
+      const totalEnrollments = employees.reduce((sum, emp) => sum + Number(emp.total || 0), 0);
+      const totalPlaced = employees.reduce((sum, emp) => sum + Number(emp.placed || 0), 0);
+
+      return ok(res, {
+        department: dept,
+        period: { from, to },
+        summary: {
+          total: totalRevenue,
+          completed: totalPlaced,
+          completion_rate: totalEnrollments > 0 ? Math.round((totalPlaced / totalEnrollments) * 1000) / 10 : 0,
+          employee_count: emps.length,
+          total_revenue: totalRevenue,
+          total_enrollments: totalEnrollments,
+        },
+        employees,
+      });
+    }
+
     const [tasks] = await db.query(
       `SELECT st.assigned_to_employee_id, st.task_type, st.status, st.call_status
        FROM support_tasks st

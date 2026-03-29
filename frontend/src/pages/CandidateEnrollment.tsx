@@ -160,9 +160,9 @@ function DatePickerField({
 
   return (
     <FormControl>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Select value={day}   onValueChange={v => { setDay(v);   commitDate(v, month, year);  }}>
-          <SelectTrigger className="w-[80px]"><SelectValue placeholder="Day" /></SelectTrigger>
+          <SelectTrigger className="w-[75px] sm:w-[80px]"><SelectValue placeholder="Day" /></SelectTrigger>
           <SelectContent>
             {Array.from({ length: daysInMonth(month, year) }, (_, i) => i + 1).map(d => (
               <SelectItem key={d} value={String(d)}>{d}</SelectItem>
@@ -312,12 +312,12 @@ export default function CandidateEnrollment() {
     }
   }
 
-  const sectionClass = "border border-border rounded-xl p-6 space-y-5 bg-card";
+  const sectionClass = "border border-border rounded-xl p-3 md:p-6 space-y-5 bg-card";
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
+    <div className="max-w-4xl mx-auto py-4 md:py-8 px-3 sm:px-4 space-y-6">
       <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-foreground">Candidate Enrollment</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-foreground">Candidate Enrollment</h1>
         <p className="text-muted-foreground">Fill in all details for the new candidate joining the company.</p>
       </div>
 
@@ -329,7 +329,7 @@ export default function CandidateEnrollment() {
             <div className="flex items-center gap-2 text-primary font-semibold text-lg mb-2">
               <User className="w-5 h-5" /> Personal Information
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField control={form.control} name="full_name" render={({ field }) => (
                 <FormItem><FormLabel>Full Name (As per ID) *</FormLabel>
                   <FormControl><Input placeholder="John Doe" {...field} /></FormControl>
@@ -369,7 +369,7 @@ export default function CandidateEnrollment() {
             <div className="flex items-center gap-2 text-primary font-semibold text-lg mb-2">
               <Shield className="w-5 h-5" /> Visa & Location
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField control={form.control} name="visa_status" render={({ field }) => (
                 <FormItem><FormLabel>Visa Status *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
@@ -435,7 +435,7 @@ export default function CandidateEnrollment() {
               )}
 
               <FormField control={form.control} name="current_location_zip" render={({ field }) => (
-                <FormItem className="md:col-span-2"><FormLabel>Full Current Location with Zip Code *</FormLabel>
+                <FormItem className="col-span-full"><FormLabel>Full Current Location with Zip Code *</FormLabel>
                   <FormControl><Input placeholder="123 Main St, Dallas TX 75001" {...field} /></FormControl>
                 <FormMessage /></FormItem>
               )} />
@@ -457,7 +457,7 @@ export default function CandidateEnrollment() {
             <div className="flex items-center gap-2 text-primary font-semibold text-lg mb-2">
               <GraduationCap className="w-5 h-5" /> Education Background
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField control={form.control} name="highest_qualification" render={({ field }) => (
                 <FormItem><FormLabel>Highest Qualification *</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
@@ -473,8 +473,8 @@ export default function CandidateEnrollment() {
             </div>
 
             {showMasters && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-border mt-4">
-                <p className="md:col-span-2 text-sm font-medium text-foreground">Master's / PhD Details</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border mt-4">
+                <p className="col-span-full text-sm font-medium text-foreground">Master's / PhD Details</p>
                 <FormField control={form.control} name="masters_field" render={({ field }) => (
                   <FormItem><FormLabel>Master's Degree Field *</FormLabel>
                     <FormControl><Input placeholder="Computer Science" {...field} /></FormControl>
@@ -498,8 +498,8 @@ export default function CandidateEnrollment() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-4 border-t border-border mt-4">
-              <p className="md:col-span-2 text-sm font-medium text-foreground">Bachelor's Details</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-border mt-4">
+              <p className="col-span-full text-sm font-medium text-foreground">Bachelor's Details</p>
               <FormField control={form.control} name="bachelors_field" render={({ field }) => (
                 <FormItem><FormLabel>Bachelor's Degree Field *</FormLabel>
                   <FormControl><Input placeholder="Information Technology" {...field} /></FormControl>
@@ -528,7 +528,7 @@ export default function CandidateEnrollment() {
             <div className="flex items-center gap-2 text-primary font-semibold text-lg mb-2">
               <Globe className="w-5 h-5" /> General Questions
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField control={form.control} name="arrived_in_usa" render={({ field }) => (
                 <FormItem><FormLabel>When arrived in USA? *</FormLabel>
                   <DatePickerField field={field} disabled={d => d > new Date()} />
@@ -606,7 +606,7 @@ export default function CandidateEnrollment() {
                 <FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="salary_expectations" render={({ field }) => (
-                <FormItem className="md:col-span-2"><FormLabel>Salary Expectations (Is it negotiable?) *</FormLabel>
+                <FormItem className="col-span-full"><FormLabel>Salary Expectations (Is it negotiable?) *</FormLabel>
                   <FormControl><Input placeholder="$120k/year, negotiable" {...field} /></FormControl>
                 <FormMessage /></FormItem>
               )} />
@@ -623,7 +623,7 @@ export default function CandidateEnrollment() {
               Salesperson will be notified 1 day before &amp; on the day of the next payment.
             </p>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Plan */}
               <FormField control={form.control} name="plan_type" render={({ field }) => (
                 <FormItem><FormLabel>Enrolled Plan</FormLabel>
@@ -652,7 +652,7 @@ export default function CandidateEnrollment() {
               )} />
 
               {/* Divider */}
-              <div className="md:col-span-2 border-t border-border pt-4">
+              <div className="col-span-full border-t border-border pt-4">
                 <p className="text-sm font-medium text-foreground mb-3">Instalment Payments</p>
               </div>
 
@@ -681,7 +681,7 @@ export default function CandidateEnrollment() {
               )} />
 
               {/* Next payment reminder */}
-              <div className="md:col-span-2 border-t border-border pt-4">
+              <div className="col-span-full border-t border-border pt-4">
                 <p className="text-sm font-medium text-foreground mb-3">Next Payment Reminder</p>
               </div>
               <FormField control={form.control} name="next_payment_date" render={({ field }) => (
@@ -706,7 +706,7 @@ export default function CandidateEnrollment() {
             <p className="text-xs text-muted-foreground mb-4">
               Select all payment methods used by this candidate. Multiple selections allowed.
             </p>
-            <div className="flex flex-wrap gap-6">
+            <div className="flex flex-wrap gap-3">
               {PAYMENT_PORTALS.map(portal => (
                 <label
                   key={portal.value}
@@ -731,7 +731,7 @@ export default function CandidateEnrollment() {
             <div className="flex items-center gap-2 text-primary font-semibold text-lg mb-2">
               <Gift className="w-5 h-5" /> Referral &amp; Sales Info
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
               {/* Salesperson */}
               <FormField control={form.control} name="salesperson_employee_id" render={({ field }) => (
@@ -763,7 +763,7 @@ export default function CandidateEnrollment() {
               )} />
 
               {/* Referral */}
-              <div className="md:col-span-2 border-t border-border pt-4">
+              <div className="col-span-full border-t border-border pt-4">
                 <p className="text-sm font-medium text-foreground mb-3">Referral Bonus</p>
               </div>
 
@@ -792,9 +792,9 @@ export default function CandidateEnrollment() {
             )} />
           </div>
 
-          <div className="flex justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
-            <Button type="submit" disabled={submitting}>
+          <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end">
+            <Button type="button" variant="outline" onClick={() => navigate(-1)} className="w-full sm:w-auto">Cancel</Button>
+            <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
               {submitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Enroll Candidate
             </Button>

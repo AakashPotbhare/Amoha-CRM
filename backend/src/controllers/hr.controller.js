@@ -224,16 +224,20 @@ async function createShift(req, res) {
       grace_period_minutes = 10,
       required_hours = 8,
       max_late_per_month = 3,
+      is_active = true,
     } = req.body;
     if (!name || !start_time || !end_time) {
       return badRequest(res, 'name, start_time, and end_time are required');
     }
 
     const id = uuidv4();
+    if (is_active) {
+      await db.query('UPDATE shift_settings SET is_active = FALSE WHERE is_active = TRUE');
+    }
     await db.query(
-      `INSERT INTO shift_settings (id, name, start_time, end_time, grace_period_minutes, required_hours, max_late_per_month)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, name, start_time, end_time, grace_period_minutes, required_hours, max_late_per_month]
+      `INSERT INTO shift_settings (id, name, start_time, end_time, grace_period_minutes, required_hours, max_late_per_month, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, name, start_time, end_time, grace_period_minutes, required_hours, max_late_per_month, !!is_active]
     );
 
     const [[shift]] = await db.query('SELECT * FROM shift_settings WHERE id = ?', [id]);
@@ -247,9 +251,14 @@ async function createShift(req, res) {
 async function updateShift(req, res) {
   try {
     const { id } = req.params;
-    const allowed = ['name','start_time','end_time','grace_period_minutes','required_hours','max_late_per_month'];
+    const allowed = ['name','start_time','end_time','grace_period_minutes','required_hours','max_late_per_month','is_active'];
     const sets = [];
     const vals = [];
+
+    if (req.body.is_active === true) {
+      await db.query('UPDATE shift_settings SET is_active = FALSE WHERE is_active = TRUE AND id <> ?', [id]);
+    }
+
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         sets.push(`${key} = ?`);
@@ -291,15 +300,15 @@ async function listOfficeLocations(req, res) {
 // POST /api/hr/office-locations
 async function createOfficeLocation(req, res) {
   try {
-    const { name, latitude, longitude, radius_meters = 200 } = req.body;
+    const { name, address = null, latitude, longitude, radius_meters = 200, is_active = true } = req.body;
     if (!name || latitude === undefined || longitude === undefined) {
       return badRequest(res, 'name, latitude, and longitude are required');
     }
 
     const id = uuidv4();
     await db.query(
-      'INSERT INTO office_locations (id, name, latitude, longitude, radius_meters) VALUES (?, ?, ?, ?, ?)',
-      [id, name, latitude, longitude, radius_meters]
+      'INSERT INTO office_locations (id, name, address, latitude, longitude, radius_meters, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [id, name, address, latitude, longitude, radius_meters, !!is_active]
     );
 
     const [[loc]] = await db.query('SELECT * FROM office_locations WHERE id = ?', [id]);
@@ -313,7 +322,7 @@ async function createOfficeLocation(req, res) {
 async function updateOfficeLocation(req, res) {
   try {
     const { id } = req.params;
-    const allowed = ['name','address','latitude','longitude','radius_meters'];
+    const allowed = ['name','address','latitude','longitude','radius_meters','is_active'];
     const sets = [];
     const vals = [];
     for (const key of allowed) {
@@ -369,7 +378,7 @@ async function uploadAvatar(req, res) {
       const baseUrl = process.env.BASE_URL || `http://localhost:${process.env.PORT || 4000}`;
       const avatar_url = `${baseUrl}/uploads/avatars/${req.file.filename}`;
 
-      await db.query('UPDATE employees SET avatar_url = ? WHERE id = ?', [avatar_url, req.params.employee_id]);
+      await db.query('UPDATE employees SET avatar_url = ? WHERE id = ?', [avatar_url, req.params.id]);
       return ok(res, { avatar_url });
     } catch (e) {
       return serverError(res, e);

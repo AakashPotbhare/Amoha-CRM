@@ -270,14 +270,14 @@ export default function Profile() {
     .toUpperCase();
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">My Profile</h1>
+    <div className="p-4 md:p-6 max-w-3xl mx-auto space-y-6">
+      <h1 className="text-xl md:text-2xl font-bold text-foreground">My Profile</h1>
 
       {/* Avatar & Name Card */}
       <Card className="card-elevated">
         <CardContent className="pt-6">
-          <div className="flex items-center gap-6">
-            <div className="relative group">
+          <div className="flex flex-col items-center text-center gap-3 sm:flex-row sm:items-start sm:text-left sm:gap-6">
+            <div className="relative group mx-auto sm:mx-0">
               <Avatar className="h-24 w-24 text-2xl">
                 <AvatarImage src={avatarUrl || undefined} />
                 <AvatarFallback className="bg-primary text-primary-foreground text-xl">{initials}</AvatarFallback>
@@ -293,7 +293,7 @@ export default function Profile() {
             <div>
               <h2 className="text-xl font-bold text-foreground">{employee.full_name}</h2>
               <p className="text-sm text-muted-foreground">{employee.designation || employee.role.replace("_", " ")}</p>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center justify-center sm:justify-start flex-wrap gap-2 mt-1">
                 <Badge variant="outline" className="text-xs">{employee.employee_code}</Badge>
                 <Badge className="bg-primary/10 text-primary text-xs">{employee.departments?.name}</Badge>
                 <Badge variant="secondary" className="text-xs">{employee.teams?.name}</Badge>
@@ -435,7 +435,7 @@ export default function Profile() {
             />
           </div>
 
-          <Button onClick={handleSave} disabled={loading} className="gap-2">
+          <Button onClick={handleSave} disabled={loading} className="gap-2 w-full sm:w-auto">
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save Changes
           </Button>
@@ -457,9 +457,9 @@ export default function Profile() {
             const doc = documents.find(d => d.document_type === key);
             const isUploading = uploadingDoc === key;
             return (
-              <div key={key} className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+              <div key={key} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border border-border bg-muted/30">
                 <div className="flex items-center gap-3">
-                  <FileText className="w-5 h-5 text-muted-foreground" />
+                  <FileText className="w-5 h-5 text-muted-foreground shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-foreground">{label}</p>
                     {doc ? (
@@ -469,7 +469,7 @@ export default function Profile() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   {doc && (
                     <>
                       <Button size="sm" variant="ghost" onClick={() => handleViewDoc(doc)} className="h-8 w-8 p-0">
@@ -522,7 +522,7 @@ export default function Profile() {
               <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter new password" />
             </div>
           </div>
-          <Button onClick={handlePasswordChange} variant="outline" className="gap-2">
+          <Button onClick={handlePasswordChange} variant="outline" className="gap-2 w-full sm:w-auto">
             <Lock className="w-4 h-4" />
             Update Password
           </Button>

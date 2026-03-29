@@ -80,7 +80,7 @@ export default function TaskInbox() {
 
   if (loading) {
     return (
-      <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+      <div className="p-3 sm:p-6 lg:p-8 max-w-5xl mx-auto">
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-24 bg-muted rounded-lg" />
@@ -91,12 +91,14 @@ export default function TaskInbox() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Task Inbox</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Tasks assigned to you, your team, or your department
-        </p>
+    <div className="p-3 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">Task Inbox</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Tasks assigned to you, your team, or your department
+          </p>
+        </div>
       </div>
 
       {tasks.length === 0 ? (
@@ -104,13 +106,13 @@ export default function TaskInbox() {
           <p className="text-muted-foreground">No tasks found</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {tasks.map((task) => (
             <div
               key={task.id}
-              className="bg-card border border-border rounded-lg p-5 card-elevated"
+              className="bg-card border border-border rounded-lg p-4 md:p-5 card-elevated"
             >
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-foreground">{task.title}</h3>
                   {task.description && (
@@ -119,14 +121,14 @@ export default function TaskInbox() {
                     </p>
                   )}
                   <div className="flex flex-wrap items-center gap-2 mt-3">
-                    <Badge variant="outline" className={priorityColors[task.priority]}>
+                    <Badge variant="outline" className={`text-xs ${priorityColors[task.priority]}`}>
                       {task.priority}
                     </Badge>
-                    <Badge variant="outline" className={statusColors[task.status]}>
+                    <Badge variant="outline" className={`text-xs ${statusColors[task.status]}`}>
                       {task.status.replace("_", " ")}
                     </Badge>
                     {task.assigned_department && (
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="text-xs">
                         {task.assigned_department.name}
                       </Badge>
                     )}

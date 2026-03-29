@@ -109,7 +109,7 @@ const PERIOD_OPTIONS = [
 ];
 
 function fmt(v: string | number) {
-  return Number(v).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(Number(v || 0));
 }
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -262,26 +262,30 @@ export default function MarketingDepartment() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Marketing Department</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Track interviews, placement offers, and candidate history
-        </p>
+    <div className="p-3 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">Marketing Department</h1>
+          <p className="text-sm text-muted-foreground">
+            Track interviews, placement offers, and candidate history
+          </p>
+        </div>
       </div>
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="po-board">PO Board</TabsTrigger>
-          <TabsTrigger value="candidate-history">Candidate History</TabsTrigger>
-          <TabsTrigger value="performance">Team Performance</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1">
+          <TabsList className="flex w-max min-w-full">
+            <TabsTrigger className="whitespace-nowrap" value="overview">Overview</TabsTrigger>
+            <TabsTrigger className="whitespace-nowrap" value="po-board">PO Board</TabsTrigger>
+            <TabsTrigger className="whitespace-nowrap" value="candidate-history">Candidate History</TabsTrigger>
+            <TabsTrigger className="whitespace-nowrap" value="performance">Team Performance</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ══ OVERVIEW TAB ══════════════════════════════════════════════════ */}
         <TabsContent value="overview" className="space-y-6">
           {/* Filters */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center flex-wrap">
             <div className="flex rounded-lg border border-border overflow-hidden">
               {(["today", "week", "month"] as const).map((r) => (
                 <button
@@ -304,14 +308,14 @@ export default function MarketingDepartment() {
           </div>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
             {[
               { label: "Interviews",   value: interviewCount,       icon: Headphones,   color: "text-primary" },
               { label: "Total Tasks",  value: filteredTasks.length, icon: Calendar,     color: "text-info" },
               { label: "Pending",      value: pendingCount,          icon: Clock,        color: "text-warning" },
               { label: "Completed",    value: completedCount,        icon: CheckCircle,  color: "text-success" },
             ].map(({ label, value, icon: Icon, color }) => (
-              <div key={label} className="bg-card rounded-lg border border-border p-4">
+              <div key={label} className="bg-card rounded-lg border border-border p-3 md:p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <Icon className={`w-4 h-4 ${color}`} />
                   <span className="text-xs font-medium text-muted-foreground">{label}</span>
@@ -368,8 +372,8 @@ export default function MarketingDepartment() {
             {todayTasks.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-6">No tasks scheduled for today</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
+              <div className="overflow-x-auto rounded-lg border">
+                <table className="w-full min-w-[640px]">
                   <thead>
                     <tr className="border-b border-border text-left">
                       <th className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase">Type</th>
@@ -414,7 +418,7 @@ export default function MarketingDepartment() {
         {/* ══ PO BOARD TAB ══════════════════════════════════════════════════ */}
         <TabsContent value="po-board" className="space-y-6">
           {/* Period selector */}
-          <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between flex-wrap gap-3">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
               <DollarSign className="w-4 h-4 text-primary" />
               Placement Offer Board
@@ -444,14 +448,14 @@ export default function MarketingDepartment() {
             <>
               {/* Org-wide totals */}
               {poTotals && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
                   {[
                     { label: "Total Offers",   value: poTotals.total_pos,                           color: "bg-primary/10 text-primary",     icon: DollarSign },
-                    { label: "Total Package",  value: `₹${fmt(poTotals.total_package)}`,             color: "bg-success/10 text-success",     icon: TrendingUp },
-                    { label: "Amount Due",     value: `₹${fmt(poTotals.total_due)}`,                 color: "bg-warning/10 text-warning",     icon: Clock },
+                    { label: "Total Package",  value: fmt(poTotals.total_package),                   color: "bg-success/10 text-success",     icon: TrendingUp },
+                    { label: "Amount Due",     value: fmt(poTotals.total_due),                       color: "bg-warning/10 text-warning",     icon: Clock },
                     { label: "Completed",      value: Number(poTotals.completed),                    color: "bg-info/10 text-info",           icon: CheckCircle },
                   ].map(({ label, value, color, icon: Icon }) => (
-                    <div key={label} className="bg-card rounded-xl border border-border p-4 card-elevated">
+                    <div key={label} className="bg-card rounded-xl border border-border p-3 md:p-6 card-elevated">
                       <div className="flex items-start justify-between mb-2">
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
                         <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${color}`}>
@@ -472,7 +476,7 @@ export default function MarketingDepartment() {
                   <p className="text-xs text-muted-foreground mt-1">Offers created will appear here grouped by team.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
                   {poTeams.map((t) => (
                     <div key={t.team_id ?? "none"} className="bg-card rounded-xl border border-border p-5 card-elevated space-y-3">
                       <div className="flex items-center justify-between">
@@ -487,15 +491,15 @@ export default function MarketingDepartment() {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="bg-secondary/50 rounded-lg p-2.5">
                           <p className="text-[10px] text-muted-foreground uppercase">Package</p>
-                          <p className="text-sm font-bold text-foreground">₹{fmt(t.total_package)}</p>
+                          <p className="text-sm font-bold text-foreground">{fmt(t.total_package)}</p>
                         </div>
                         <div className="bg-secondary/50 rounded-lg p-2.5">
                           <p className="text-[10px] text-muted-foreground uppercase">Due</p>
-                          <p className="text-sm font-bold text-warning">₹{fmt(t.total_due)}</p>
+                          <p className="text-sm font-bold text-warning">{fmt(t.total_due)}</p>
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border pt-2">
-                        <span>Upfront received: ₹{fmt(t.total_upfront)}</span>
+                        <span>Upfront received: {fmt(t.total_upfront)}</span>
                         <span className="text-success font-medium">{Number(t.completed)} closed</span>
                       </div>
                     </div>
@@ -519,7 +523,7 @@ export default function MarketingDepartment() {
           </div>
 
           {/* Search box */}
-          <div className="relative max-w-md">
+          <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
@@ -585,7 +589,7 @@ export default function MarketingDepartment() {
               {history && !loadingHistory && (
                 <>
                   {/* Summary row */}
-                  <div className="grid grid-cols-3 gap-3 max-w-md">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-md">
                     {[
                       { label: "Total Tasks",  value: history.history.length,                                             color: "text-foreground" },
                       { label: "Completed",    value: history.history.filter(h => h.status === "completed").length,       color: "text-success" },

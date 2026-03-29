@@ -281,15 +281,17 @@ export default function AttendanceReport() {
   const weekHeaders = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Attendance Report</h1>
-        <p className="text-sm text-muted-foreground">Monthly summary with an employee-wise attendance calendar</p>
+    <div className="p-3 md:p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">Attendance Report</h1>
+          <p className="text-sm text-muted-foreground">Monthly summary with an employee-wise attendance calendar</p>
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <Select value={String(month)} onValueChange={(value) => setMonth(Number(value))}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-full sm:w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -300,7 +302,7 @@ export default function AttendanceReport() {
         </Select>
 
         <Select value={String(year)} onValueChange={(value) => setYear(Number(value))}>
-          <SelectTrigger className="w-28">
+          <SelectTrigger className="w-full sm:w-28">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -311,7 +313,7 @@ export default function AttendanceReport() {
         </Select>
 
         <Select value={selectedEmployeeId || undefined} onValueChange={setSelectedEmployeeId} disabled={employeeOptions.length === 0}>
-          <SelectTrigger className="min-w-[240px]">
+          <SelectTrigger className="w-full sm:min-w-[240px] sm:w-auto">
             <SelectValue placeholder="Select employee" />
           </SelectTrigger>
           <SelectContent>
@@ -325,7 +327,7 @@ export default function AttendanceReport() {
       </div>
 
       {stats.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
           <Card>
             <CardContent className="pt-4">
               <div className="mb-1 flex items-center gap-2 text-sm text-muted-foreground">
@@ -373,7 +375,8 @@ export default function AttendanceReport() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
+          <div className="overflow-x-auto rounded-lg border">
+          <Table className="min-w-[700px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Employee</TableHead>
@@ -418,6 +421,7 @@ export default function AttendanceReport() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
 
@@ -448,40 +452,42 @@ export default function AttendanceReport() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-7 gap-2">
-              {weekHeaders.map((day) => (
-                <div key={day} className="px-2 py-1 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {day}
-                </div>
-              ))}
-              {calendarDays.map((day) => {
-                const inMonth = isSameMonth(day.date, new Date(year, month - 1, 1));
-                const selected = selectedDate ? isSameDay(day.date, selectedDate) : false;
-                return (
-                  <button
-                    key={day.date.toISOString()}
-                    type="button"
-                    onClick={() => setSelectedDate(day.date)}
-                    className={cn(
-                      "min-h-[92px] rounded-2xl border p-2 text-left transition-colors",
-                      STATUS_STYLES[day.status],
-                      !inMonth && "opacity-35",
-                      selected && "ring-2 ring-primary ring-offset-2",
-                      isToday(day.date) && inMonth && "shadow-[inset_0_0_0_1px_hsl(var(--primary))]",
-                    )}
-                  >
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="text-sm font-semibold">{format(day.date, "d")}</span>
-                      {isToday(day.date) && inMonth && <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">Today</Badge>}
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium">{STATUS_SHORT[day.status]}</p>
-                      <p className="line-clamp-2 text-[11px] leading-4">{day.label}</p>
-                      {day.totalHours != null && <p className="text-[10px] opacity-80">{day.totalHours.toFixed(1)}h</p>}
-                    </div>
-                  </button>
-                );
-              })}
+            <div className="overflow-x-auto">
+              <div className="grid grid-cols-7 gap-1 md:gap-2 min-w-[320px]">
+                {weekHeaders.map((day) => (
+                  <div key={day} className="px-1 md:px-2 py-1 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {day}
+                  </div>
+                ))}
+                {calendarDays.map((day) => {
+                  const inMonth = isSameMonth(day.date, new Date(year, month - 1, 1));
+                  const selected = selectedDate ? isSameDay(day.date, selectedDate) : false;
+                  return (
+                    <button
+                      key={day.date.toISOString()}
+                      type="button"
+                      onClick={() => setSelectedDate(day.date)}
+                      className={cn(
+                        "min-h-[56px] md:min-h-[92px] rounded-xl md:rounded-2xl border p-1 md:p-2 text-left transition-colors",
+                        STATUS_STYLES[day.status],
+                        !inMonth && "opacity-35",
+                        selected && "ring-2 ring-primary ring-offset-2",
+                        isToday(day.date) && inMonth && "shadow-[inset_0_0_0_1px_hsl(var(--primary))]",
+                      )}
+                    >
+                      <div className="mb-1 md:mb-3 flex items-center justify-between">
+                        <span className="text-xs font-semibold">{format(day.date, "d")}</span>
+                        {isToday(day.date) && inMonth && <Badge variant="secondary" className="hidden sm:inline-flex px-1.5 py-0 text-[10px]">Today</Badge>}
+                      </div>
+                      <div className="space-y-0.5 md:space-y-1">
+                        <p className="text-xs font-medium">{STATUS_SHORT[day.status]}</p>
+                        <p className="hidden md:block line-clamp-2 text-[11px] leading-4">{day.label}</p>
+                        {day.totalHours != null && <p className="hidden sm:block text-[10px] opacity-80">{day.totalHours.toFixed(1)}h</p>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </CardContent>
         </Card>

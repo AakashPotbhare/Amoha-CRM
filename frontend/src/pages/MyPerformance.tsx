@@ -113,7 +113,7 @@ export default function MyPerformance() {
   if (!employee) return null;
 
   return (
-    <div className="space-y-6 p-6 max-w-5xl mx-auto">
+    <div className="space-y-4 md:space-y-6 p-4 md:p-6 max-w-5xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -127,12 +127,12 @@ export default function MyPerformance() {
         </div>
 
         {/* Period selector */}
-        <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
+        <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1 flex-wrap">
           {PERIOD_OPTIONS.map(opt => (
             <button
               key={opt.value}
               onClick={() => setPeriod(opt.value)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+              className={`px-2 sm:px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                 period === opt.value
                   ? "bg-card text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
@@ -170,7 +170,7 @@ export default function MyPerformance() {
           </div>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             <StatCard
               label="Total Tasks"
               value={data.summary.total}
@@ -234,7 +234,7 @@ export default function MyPerformance() {
                   <BarChart3 className="w-4 h-4 text-primary" />
                   Tasks by Type
                 </h3>
-                <div className="h-52">
+                <div className="min-h-[200px] md:min-h-[208px] h-52 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -315,7 +315,7 @@ export default function MyPerformance() {
                 <TrendingUp className="w-4 h-4 text-primary" />
                 Weekly Trend
               </h3>
-              <div className="h-60">
+              <div className="min-h-[200px] md:min-h-[300px] h-60 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={barData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                     <XAxis

@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { api } from "@/lib/api.client";
-import { Loader2, FileText, CheckCircle, Clock, Users, AlertCircle, MessageSquare, Send, Paperclip } from "lucide-react";
+import { Loader2, FileText, CheckCircle, Clock, Users, AlertCircle, MessageSquare, Send, UploadCloud } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +27,7 @@ interface ResumeTask {
   notes: string | null;
   created_at: string;
   company_name: string | null;
+  candidate_enrollment_id: string | null;
 }
 
 interface TaskComment {
@@ -35,6 +36,16 @@ interface TaskComment {
   created_at: string;
   employee_name: string;
   employee_designation: string | null;
+}
+
+interface ResumeVersion {
+  id: string;
+  file_url: string;
+  file_name: string;
+  notes: string | null;
+  is_current: boolean;
+  created_at: string;
+  uploaded_by_name?: string | null;
 }
 
 const STATUS_OPTIONS = [
@@ -59,32 +70,37 @@ export default function ResumeDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, TaskComment[]>>({});
+  const [resumeLogs, setResumeLogs] = useState<Record<string, ResumeVersion[]>>({});
+  const [resumeNotes, setResumeNotes] = useState<Record<string, string>>({});
   const [newComment, setNewComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [loadingResumeLogsFor, setLoadingResumeLogsFor] = useState<string | null>(null);
+  const [uploadingResumeFor, setUploadingResumeFor] = useState<string | null>(null);
 
   const fetchTasks = useCallback(async () => {
-    const res = await api.get<ResumeTask[]>(
-      '/api/support-tasks?type=resume_building&limit=100'
-    );
+    const response = await api.get<ResumeTask[]>("/api/support-tasks?limit=100");
     setTasks(
-      (res.data ?? []).map((t: any) => ({
-        id: t.id,
-        task_type: t.task_type,
-        status: t.status,
-        priority: t.priority ?? 'medium',
-        candidate_name: t.candidate_name ?? 'Unknown',
+      (response.data ?? [])
+        .filter((task: any) => ["resume_building", "resume_rebuilding"].includes(task.task_type))
+        .map((task: any) => ({
+        id: task.id,
+        task_type: task.task_type,
+        status: task.status,
+        priority: task.priority ?? "medium",
+        candidate_name: task.candidate_name ?? "Unknown",
         candidate_technology: null,
-        created_by_name: t.created_by_name ?? 'Unknown',
-        created_by_department: t.department_name ?? '',
-        assigned_employee_name: t.assigned_to_name ?? null,
-        support_person_name: t.assigned_to_name ?? null,
+        created_by_name: task.created_by_name ?? "Unknown",
+        created_by_department: task.department_name ?? "",
+        assigned_employee_name: task.assigned_to_name ?? null,
+        support_person_name: task.assigned_to_name ?? null,
         preferred_handler_name: null,
-        scheduled_date: t.scheduled_at ?? null,
+        scheduled_date: task.scheduled_at ?? null,
         deadline_date: null,
-        notes: t.notes ?? null,
-        created_at: t.created_at,
+        notes: task.notes ?? null,
+        created_at: task.created_at,
         company_name: null,
+        candidate_enrollment_id: task.candidate_enrollment_id ?? null,
       }))
     );
     setLoading(false);
@@ -92,33 +108,47 @@ export default function ResumeDashboard() {
 
   useEffect(() => {
     if (!employee) return;
-    fetchTasks();
+    void fetchTasks();
   }, [employee, fetchTasks]);
 
   const fetchComments = async (taskId: string) => {
-    const res = await api.get<any>(`/api/support-tasks/${taskId}`);
-    const taskData = res.data;
+    const response = await api.get<any>(`/api/support-tasks/${taskId}`);
+    const taskData = response.data;
     if (taskData?.comments) {
-      setComments((prev) => ({
-        ...prev,
-        [taskId]: taskData.comments.map((c: any) => ({
-          id: c.id,
-          content: c.content,
-          created_at: c.created_at,
-          employee_name: c.author_name ?? 'Unknown',
+      setComments((current) => ({
+        ...current,
+        [taskId]: taskData.comments.map((comment: any) => ({
+          id: comment.id,
+          content: comment.content,
+          created_at: comment.created_at,
+          employee_name: comment.author_name ?? "Unknown",
           employee_designation: null,
         })),
       }));
     }
   };
 
-  const toggleExpand = (taskId: string) => {
-    if (expandedTask === taskId) {
-      setExpandedTask(null);
-    } else {
-      setExpandedTask(taskId);
-      if (!comments[taskId]) fetchComments(taskId);
+  const fetchResumeLogs = async (task: ResumeTask) => {
+    if (!task.candidate_enrollment_id) return;
+    setLoadingResumeLogsFor(task.id);
+    try {
+      const response = await api.get<ResumeVersion[]>(`/api/candidates/${task.candidate_enrollment_id}/resumes`);
+      setResumeLogs((current) => ({ ...current, [task.id]: response.data ?? [] }));
+    } catch (err: any) {
+      toast({ title: "Failed to load resume history", description: err.message, variant: "destructive" });
+    } finally {
+      setLoadingResumeLogsFor(null);
     }
+  };
+
+  const toggleExpand = (task: ResumeTask) => {
+    if (expandedTask === task.id) {
+      setExpandedTask(null);
+      return;
+    }
+    setExpandedTask(task.id);
+    if (!comments[task.id]) void fetchComments(task.id);
+    if (!resumeLogs[task.id] && task.candidate_enrollment_id) void fetchResumeLogs(task);
   };
 
   const addComment = async (taskId: string) => {
@@ -127,9 +157,9 @@ export default function ResumeDashboard() {
     try {
       await api.post(`/api/support-tasks/${taskId}/comments`, { content: newComment.trim() });
       setNewComment("");
-      fetchComments(taskId);
+      await fetchComments(taskId);
     } catch (err: any) {
-      toast({ title: "Error", description: err?.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setSubmittingComment(false);
     }
@@ -139,43 +169,64 @@ export default function ResumeDashboard() {
     setUpdatingStatus(taskId);
     try {
       await api.patch(`/api/support-tasks/${taskId}/status`, { status: newStatus });
-      fetchTasks();
+      await fetchTasks();
       toast({ title: "Status updated" });
     } catch (err: any) {
-      toast({ title: "Error", description: err?.message, variant: "destructive" });
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {
       setUpdatingStatus(null);
     }
   };
 
+  const uploadResume = async (task: ResumeTask, file: File) => {
+    if (!task.candidate_enrollment_id) return;
+    setUploadingResumeFor(task.id);
+    try {
+      const token = localStorage.getItem("recruithub_token");
+      const formData = new FormData();
+      formData.append("resume", file);
+      formData.append("notes", resumeNotes[task.id] ?? "");
+      formData.append("support_task_id", task.id);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:4000"}/api/candidates/${task.candidate_enrollment_id}/resumes`,
+        { method: "POST", headers: token ? { Authorization: `Bearer ${token}` } : {}, body: formData }
+      );
+      const json = await response.json();
+      if (!response.ok || !json.success) throw new Error(json.error || "Upload failed");
+
+      setResumeNotes((current) => ({ ...current, [task.id]: "" }));
+      await Promise.all([fetchResumeLogs(task), fetchTasks()]);
+      toast({ title: "Resume uploaded", description: "The latest resume version is now linked to this candidate." });
+    } catch (err: any) {
+      toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+    } finally {
+      setUploadingResumeFor(null);
+    }
+  };
+
   const filtered = useMemo(() => {
     if (statusFilter === "all") return tasks;
-    return tasks.filter((t) => t.status === statusFilter);
+    return tasks.filter((task) => task.status === statusFilter);
   }, [tasks, statusFilter]);
 
-  const queuedCount = tasks.filter((t) => t.status === "pending").length;
-  const inProgressCount = tasks.filter((t) => t.status === "in_progress").length;
-  const notReachedCount = tasks.filter((t) => t.status === "not_reached").length;
-  const completedCount = tasks.filter((t) => t.status === "completed").length;
-
-  const selectClass = "border border-input rounded-md px-3 py-1.5 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
+  const queuedCount = tasks.filter((task) => task.status === "pending").length;
+  const inProgressCount = tasks.filter((task) => task.status === "in_progress").length;
+  const notReachedCount = tasks.filter((task) => task.status === "not_reached").length;
+  const completedCount = tasks.filter((task) => task.status === "completed").length;
+  const selectClass = "rounded-md border border-input bg-background px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
   if (loading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="flex min-h-[400px] items-center justify-center p-6"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6 p-6 lg:p-8">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Resume Department</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Manage resume building & rebuilding requests from Sales and Marketing
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Manage resume building requests and keep every candidate resume version visible in the workflow.</p>
       </div>
+
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -183,218 +234,149 @@ export default function ResumeDashboard() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-card rounded-lg border border-border p-4 card-elevated">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-4 h-4 text-warning" />
-            <span className="text-xs font-medium text-muted-foreground">In Queue</span>
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="card-elevated rounded-lg border border-border bg-card p-4"><div className="mb-2 flex items-center gap-2"><Clock className="h-4 w-4 text-warning" /><span className="text-xs font-medium text-muted-foreground">In Queue</span></div><p className="text-2xl font-bold text-foreground">{queuedCount}</p></div>
+            <div className="card-elevated rounded-lg border border-border bg-card p-4"><div className="mb-2 flex items-center gap-2"><Users className="h-4 w-4 text-info" /><span className="text-xs font-medium text-muted-foreground">In Progress</span></div><p className="text-2xl font-bold text-foreground">{inProgressCount}</p></div>
+            <div className="card-elevated rounded-lg border border-border bg-card p-4"><div className="mb-2 flex items-center gap-2"><AlertCircle className="h-4 w-4 text-destructive" /><span className="text-xs font-medium text-muted-foreground">Not Reached</span></div><p className="text-2xl font-bold text-foreground">{notReachedCount}</p></div>
+            <div className="card-elevated rounded-lg border border-border bg-card p-4"><div className="mb-2 flex items-center gap-2"><CheckCircle className="h-4 w-4 text-success" /><span className="text-xs font-medium text-muted-foreground">Completed</span></div><p className="text-2xl font-bold text-foreground">{completedCount}</p></div>
           </div>
-          <p className="text-2xl font-bold text-foreground">{queuedCount}</p>
-        </div>
-        <div className="bg-card rounded-lg border border-border p-4 card-elevated">
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="w-4 h-4 text-info" />
-            <span className="text-xs font-medium text-muted-foreground">In Progress</span>
+
+          <div className="flex items-center gap-3">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={selectClass}>
+              <option value="all">All Statuses ({tasks.length})</option>
+              <option value="pending">Queued ({queuedCount})</option>
+              <option value="in_progress">In Progress ({inProgressCount})</option>
+              <option value="not_reached">Not Reached ({notReachedCount})</option>
+              <option value="completed">Completed ({completedCount})</option>
+            </select>
           </div>
-          <p className="text-2xl font-bold text-foreground">{inProgressCount}</p>
-        </div>
-        <div className="bg-card rounded-lg border border-border p-4 card-elevated">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertCircle className="w-4 h-4 text-destructive" />
-            <span className="text-xs font-medium text-muted-foreground">Not Reached</span>
-          </div>
-          <p className="text-2xl font-bold text-foreground">{notReachedCount}</p>
-        </div>
-        <div className="bg-card rounded-lg border border-border p-4 card-elevated">
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle className="w-4 h-4 text-success" />
-            <span className="text-xs font-medium text-muted-foreground">Completed</span>
-          </div>
-          <p className="text-2xl font-bold text-foreground">{completedCount}</p>
-        </div>
-      </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 items-center">
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={selectClass}>
-          <option value="all">All Statuses ({tasks.length})</option>
-          <option value="pending">Queued ({queuedCount})</option>
-          <option value="in_progress">In Progress ({inProgressCount})</option>
-          <option value="not_reached">Not Reached ({notReachedCount})</option>
-          <option value="completed">Completed ({completedCount})</option>
-        </select>
-      </div>
-
-      {/* Task Queue */}
-      <div className="space-y-3">
-        {filtered.length === 0 && (
-          <div className="bg-card rounded-lg border border-border p-8 text-center text-muted-foreground">
-            <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
-            <p>No resume tasks found</p>
-          </div>
-        )}
-
-        {filtered.map((task) => {
-          const isExpanded = expandedTask === task.id;
-          const taskComments = comments[task.id] || [];
-          const statusInfo = STATUS_OPTIONS.find((s) => s.value === task.status) || STATUS_OPTIONS[0];
-
-          return (
-            <div key={task.id} className="bg-card rounded-lg border border-border overflow-hidden card-elevated">
-              {/* Task row */}
-              <div
-                className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 cursor-pointer hover:bg-secondary/30 transition-colors"
-                onClick={() => toggleExpand(task.id)}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-sm text-foreground">{task.candidate_name}</span>
-                    {task.candidate_technology && (
-                      <Badge variant="outline" className="text-xs">{task.candidate_technology}</Badge>
-                    )}
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {task.task_type.replace("_", " ")}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    From <span className="font-medium">{task.created_by_name}</span>
-                    {task.created_by_department && ` (${task.created_by_department})`}
-                    {" · "}
-                    {format(new Date(task.created_at), "MMM d, h:mm a")}
-                    {task.company_name && ` · ${task.company_name}`}
-                    {task.support_person_name && (
-                      <> · <span className="text-primary font-medium">Working: {task.support_person_name}</span></>
-                    )}
-                  </p>
-                  {task.preferred_handler_name && (
-                    <Badge variant="outline" className="text-[10px] mt-1 border-primary/40 text-primary">
-                      ⭐ Preferred: {task.preferred_handler_name}
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${PRIORITY_COLORS[task.priority] || ""}`}>
-                    {task.priority}
-                  </span>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusInfo.color}`}>
-                    {statusInfo.label}
-                  </span>
-                  {taskComments.length > 0 && (
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MessageSquare className="w-3 h-3" /> {taskComments.length}
-                    </span>
-                  )}
-                </div>
+          <div className="space-y-3">
+            {filtered.length === 0 && (
+              <div className="rounded-lg border border-border bg-card p-8 text-center text-muted-foreground">
+                <FileText className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                <p>No resume tasks found</p>
               </div>
+            )}
 
-              {/* Expanded section */}
-              {isExpanded && (
-                <div className="border-t border-border">
-                  {/* Task details */}
-                  <div className="p-4 bg-secondary/20 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                    <div>
-                      <span className="text-xs text-muted-foreground block">Assigned To</span>
-                      <span className="text-foreground">{task.assigned_employee_name || "Unassigned"}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground block">Working On It</span>
-                      <span className="text-foreground">{task.support_person_name || "Not picked up"}</span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground block">Scheduled</span>
-                      <span className="text-foreground">
-                        {task.scheduled_date ? format(new Date(task.scheduled_date), "MMM d, yyyy") : "—"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground block">Deadline</span>
-                      <span className="text-foreground">
-                        {task.deadline_date ? format(new Date(task.deadline_date), "MMM d, yyyy") : "—"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-xs text-muted-foreground block">Update Status</span>
-                      <select
-                        value={task.status}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => updateTaskStatus(task.id, e.target.value)}
-                        disabled={updatingStatus === task.id}
-                        className="border border-input rounded px-2 py-1 text-xs bg-background text-foreground"
-                      >
-                        {STATUS_OPTIONS.map((s) => (
-                          <option key={s.value} value={s.value}>{s.label}</option>
-                        ))}
-                      </select>
+            {filtered.map((task) => {
+              const isExpanded = expandedTask === task.id;
+              const taskComments = comments[task.id] || [];
+              const taskResumeLogs = resumeLogs[task.id] || [];
+              const statusInfo = STATUS_OPTIONS.find((status) => status.value === task.status) || STATUS_OPTIONS[0];
+
+              return (
+                <div key={task.id} className="card-elevated overflow-hidden rounded-lg border border-border bg-card">
+                  <div className="cursor-pointer p-4 transition-colors hover:bg-secondary/30" onClick={() => toggleExpand(task)}>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-foreground">{task.candidate_name}</span>
+                          <Badge variant="outline" className="text-xs capitalize">{task.task_type.replace("_", " ")}</Badge>
+                          {task.candidate_enrollment_id && <Badge variant="secondary" className="text-xs">{taskResumeLogs.length} resume logs</Badge>}
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          From <span className="font-medium">{task.created_by_name}</span>
+                          {task.created_by_department && ` (${task.created_by_department})`}
+                          {" | "}
+                          {format(new Date(task.created_at), "MMM d, h:mm a")}
+                          {task.support_person_name && <> | <span className="font-medium text-primary">Working: {task.support_person_name}</span></>}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${PRIORITY_COLORS[task.priority] || ""}`}>{task.priority}</span>
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusInfo.color}`}>{statusInfo.label}</span>
+                        {taskComments.length > 0 && <span className="flex items-center gap-1 text-xs text-muted-foreground"><MessageSquare className="h-3 w-3" />{taskComments.length}</span>}
+                      </div>
                     </div>
                   </div>
-                  {task.notes && (
-                    <div className="px-4 py-2 bg-secondary/10 text-sm text-muted-foreground border-t border-border">
-                      <span className="font-medium text-foreground text-xs">Notes: </span>{task.notes}
-                    </div>
-                  )}
 
-                  {/* Comments section */}
-                  <div className="p-4 space-y-3">
-                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Activity & Comments ({taskComments.length})
-                    </h4>
+                  {isExpanded && (
+                    <div className="border-t border-border">
+                      <div className="grid grid-cols-2 gap-3 bg-secondary/20 p-4 text-sm sm:grid-cols-4">
+                        <div><span className="block text-xs text-muted-foreground">Assigned To</span><span className="text-foreground">{task.assigned_employee_name || "Unassigned"}</span></div>
+                        <div><span className="block text-xs text-muted-foreground">Working On It</span><span className="text-foreground">{task.support_person_name || "Not picked up"}</span></div>
+                        <div><span className="block text-xs text-muted-foreground">Scheduled</span><span className="text-foreground">{task.scheduled_date ? format(new Date(task.scheduled_date), "MMM d, yyyy") : "-"}</span></div>
+                        <div>
+                          <span className="block text-xs text-muted-foreground">Update Status</span>
+                          <select value={task.status} onClick={(e) => e.stopPropagation()} onChange={(e) => void updateTaskStatus(task.id, e.target.value)} disabled={updatingStatus === task.id} className="rounded border border-input bg-background px-2 py-1 text-xs text-foreground">
+                            {STATUS_OPTIONS.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}
+                          </select>
+                        </div>
+                      </div>
 
-                    {taskComments.length === 0 && (
-                      <p className="text-xs text-muted-foreground">No comments yet. Add updates visible to all departments.</p>
-                    )}
+                      {task.notes && <div className="border-t border-border bg-secondary/10 px-4 py-2 text-sm text-muted-foreground"><span className="text-xs font-medium text-foreground">Notes: </span>{task.notes}</div>}
 
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {taskComments.map((c) => (
-                        <div key={c.id} className="flex gap-2">
-                          <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <span className="text-[10px] font-bold text-primary">
-                              {c.employee_name.charAt(0)}
-                            </span>
+                      {task.candidate_enrollment_id && (
+                        <div className="space-y-3 border-t border-border p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Resume Versions</h4>
+                            {loadingResumeLogsFor === task.id && <span className="text-xs text-muted-foreground"><Loader2 className="mr-1 inline h-3 w-3 animate-spin" />Loading logs</span>}
                           </div>
-                          <div className="flex-1">
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-xs font-medium text-foreground">{c.employee_name}</span>
-                              {c.employee_designation && (
-                                <span className="text-[10px] text-muted-foreground">{c.employee_designation}</span>
-                              )}
-                              <span className="text-[10px] text-muted-foreground">
-                                {format(new Date(c.created_at), "MMM d, h:mm a")}
-                              </span>
-                            </div>
-                            <p className="text-sm text-foreground mt-0.5">{c.content}</p>
+                          <Textarea value={resumeNotes[task.id] ?? ""} onChange={(e) => setResumeNotes((current) => ({ ...current, [task.id]: e.target.value }))} placeholder="Add a note for the new resume version..." rows={2} />
+                          <div className="flex flex-wrap items-center gap-3">
+                            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-4 py-2 text-sm hover:bg-muted/40">
+                              <UploadCloud className="h-4 w-4" />
+                              Upload Latest Resume
+                              <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadResume(task, file); e.currentTarget.value = ""; }} />
+                            </label>
+                            {uploadingResumeFor === task.id && <span className="text-sm text-muted-foreground"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Uploading...</span>}
+                          </div>
+                          <div className="space-y-2">
+                            {taskResumeLogs.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No resume versions uploaded for this candidate yet.</p>
+                            ) : (
+                              taskResumeLogs.map((resume) => (
+                                <div key={resume.id} className="rounded-lg border border-border p-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <button onClick={() => window.open(resume.file_url, "_blank")} className="truncate text-left text-sm font-medium text-primary hover:underline">
+                                        {resume.file_name}
+                                      </button>
+                                      <p className="mt-1 text-xs text-muted-foreground">
+                                        {format(new Date(resume.created_at), "MMM d, yyyy h:mm a")} | {resume.uploaded_by_name || "Unknown"}
+                                      </p>
+                                      {resume.notes && <p className="mt-2 text-sm text-muted-foreground">{resume.notes}</p>}
+                                    </div>
+                                    {resume.is_current && <Badge>Current</Badge>}
+                                  </div>
+                                </div>
+                              ))
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      )}
 
-                    {/* Add comment */}
-                    <div className="flex gap-2 pt-2 border-t border-border" onClick={(e) => e.stopPropagation()}>
-                      <Textarea
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        placeholder="Add a comment visible to all departments..."
-                        className="min-h-[36px] text-sm resize-none"
-                        rows={1}
-                        maxLength={2000}
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => addComment(task.id)}
-                        disabled={submittingComment || !newComment.trim()}
-                        className="flex-shrink-0"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                      </Button>
+                      <div className="space-y-3 border-t border-border p-4">
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Activity & Comments ({taskComments.length})</h4>
+                        {taskComments.length === 0 && <p className="text-xs text-muted-foreground">No comments yet. Add updates visible to all departments.</p>}
+                        <div className="max-h-60 space-y-2 overflow-y-auto">
+                          {taskComments.map((comment) => (
+                            <div key={comment.id} className="flex gap-2">
+                              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10"><span className="text-[10px] font-bold text-primary">{comment.employee_name.charAt(0)}</span></div>
+                              <div className="flex-1">
+                                <div className="flex items-baseline gap-2">
+                                  <span className="text-xs font-medium text-foreground">{comment.employee_name}</span>
+                                  <span className="text-[10px] text-muted-foreground">{format(new Date(comment.created_at), "MMM d, h:mm a")}</span>
+                                </div>
+                                <p className="mt-0.5 text-sm text-foreground">{comment.content}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex gap-2 border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
+                          <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Add a comment visible to all departments..." className="min-h-[36px] resize-none text-sm" rows={1} maxLength={2000} />
+                          <Button size="sm" onClick={() => void addComment(task.id)} disabled={submittingComment || !newComment.trim()} className="flex-shrink-0">
+                            <Send className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
         </TabsContent>
 
         <TabsContent value="performance">

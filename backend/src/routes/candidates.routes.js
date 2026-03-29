@@ -7,6 +7,8 @@ router.use(authenticate);
 
 router.get('/',              c.list);
 router.get('/pipeline-stats', c.pipelineStats);
+router.get('/:id/resumes',   c.listResumes);
+router.post('/:id/resumes',  c.uploadResume);
 router.get('/:id',           c.getOne);
 router.post('/',             c.enroll);
 router.patch('/:id',         c.update);

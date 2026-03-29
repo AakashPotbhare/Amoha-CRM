@@ -642,23 +642,25 @@ export default function HRDashboard() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-3 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
 
       {/* ── Page header ── */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">HR Management</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">HR Management</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Employee records, payroll, probation monitoring · As of {format(new Date(), "dd MMM yyyy")}
           </p>
         </div>
-        <Button onClick={openAdd} className="gap-2">
-          <UserPlus className="w-4 h-4" /> Add Employee
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button onClick={openAdd} className="gap-2 w-full sm:w-auto">
+            <UserPlus className="w-4 h-4" /> Add Employee
+          </Button>
+        </div>
       </div>
 
       {/* ── Stats bar ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         {[
           { label: "Total Staff",     value: stats.total,     icon: Users,         color: "text-primary",    bg: "bg-primary/10" },
           { label: "Active",          value: stats.active,    icon: CheckCircle,   color: "text-success",    bg: "bg-success/10" },
@@ -679,28 +681,30 @@ export default function HRDashboard() {
 
       {/* ── Tabs ── */}
       <Tabs defaultValue="team" className="space-y-4">
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="team">Team Directory</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll Report</TabsTrigger>
-          <TabsTrigger value="probation" className="relative">
-            Probation
-            {stats.probation > 0 && (
-              <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold bg-warning text-warning-foreground rounded-full">
-                {stats.probation}
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="notices">Notice Board</TabsTrigger>
-          <TabsTrigger value="shifts" onClick={() => { if (!shifts.length) fetchShifts(); }}>Shifts</TabsTrigger>
-          <TabsTrigger value="locations" onClick={() => { if (!locations.length) fetchLocations(); }}>Office Locations</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1">
+          <TabsList className="flex w-max min-w-full h-auto gap-1">
+            <TabsTrigger value="team" className="whitespace-nowrap px-3 text-sm">Team Directory</TabsTrigger>
+            <TabsTrigger value="payroll" className="whitespace-nowrap px-3 text-sm">Payroll Report</TabsTrigger>
+            <TabsTrigger value="probation" className="relative whitespace-nowrap px-3 text-sm">
+              Probation
+              {stats.probation > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold bg-warning text-warning-foreground rounded-full">
+                  {stats.probation}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="notices" className="whitespace-nowrap px-3 text-sm">Notice Board</TabsTrigger>
+            <TabsTrigger value="shifts" className="whitespace-nowrap px-3 text-sm" onClick={() => { if (!shifts.length) fetchShifts(); }}>Shifts</TabsTrigger>
+            <TabsTrigger value="locations" className="whitespace-nowrap px-3 text-sm" onClick={() => { if (!locations.length) fetchLocations(); }}>Office Locations</TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ════════════════════════════════════════════════════
             TAB 1 — TEAM DIRECTORY
         ════════════════════════════════════════════════════ */}
         <TabsContent value="team" className="space-y-4">
           {/* Filters */}
-          <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center flex-wrap">
             <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -742,7 +746,7 @@ export default function HRDashboard() {
           {/* Employee table */}
           <div className="bg-card border border-border rounded-lg overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[900px] text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/30">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Employee</th>
@@ -862,7 +866,7 @@ export default function HRDashboard() {
         ════════════════════════════════════════════════════ */}
         <TabsContent value="payroll" className="space-y-4">
           {/* Controls */}
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center flex-wrap">
             <select
               value={payMonth}
               onChange={e => setPayMonth(Number(e.target.value))}
@@ -890,7 +894,7 @@ export default function HRDashboard() {
               Generate
             </Button>
             {payrollData.length > 0 && (
-              <Button variant="outline" size="sm" onClick={downloadPayrollCSV} className="gap-2 ml-auto">
+              <Button variant="outline" size="sm" onClick={downloadPayrollCSV} className="gap-2 w-full sm:w-auto sm:ml-auto">
                 <Download className="w-4 h-4" /> Export CSV
               </Button>
             )}
@@ -902,7 +906,7 @@ export default function HRDashboard() {
             const totalPf   = payrollData.reduce((s, r) => s + Math.round((r.base_salary * r.pf_percentage) / 100), 0);
             const totalNet  = payrollData.reduce((s, r) => s + netPay(r), 0);
             return (
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6">
                 <div className="bg-card border border-border rounded-lg p-4 text-center">
                   <p className="text-xs text-muted-foreground mb-1">Total Gross</p>
                   <p className="text-xl font-bold text-foreground">{fmtCurrency(totalBase)}</p>
@@ -931,7 +935,7 @@ export default function HRDashboard() {
           ) : (
             <div className="bg-card border border-border rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[900px] text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
                       <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">Employee</th>
@@ -993,7 +997,7 @@ export default function HRDashboard() {
                 Sorted by days remaining.
               </p>
               {probationEmployees.map(emp => (
-                <div key={emp.id} className={`bg-card border rounded-lg p-4 flex items-center gap-4 ${emp.probInfo.daysLeft <= 14 ? "border-warning/50 bg-warning/5" : "border-border"}`}>
+                <div key={emp.id} className={`bg-card border rounded-lg p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 ${emp.probInfo.daysLeft <= 14 ? "border-warning/50 bg-warning/5" : "border-border"}`}>
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     <span className="text-sm font-bold text-primary">{emp.full_name.charAt(0)}</span>
                   </div>
@@ -1037,13 +1041,13 @@ export default function HRDashboard() {
             TAB 5 — SHIFT MANAGEMENT
         ════════════════════════════════════════════════════ */}
         <TabsContent value="shifts" className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-foreground">Shift Management</h2>
               <p className="text-xs text-muted-foreground mt-0.5">Define and manage work shifts for attendance tracking.</p>
             </div>
             {(employee?.role === "director" || employee?.role === "hr_head") && (
-              <Button size="sm" className="gap-2" onClick={() => setAddShiftOpen(true)}>
+              <Button size="sm" className="gap-2 w-full sm:w-auto" onClick={() => setAddShiftOpen(true)}>
                 <Plus className="w-4 h-4" /> Add Shift
               </Button>
             )}
@@ -1060,7 +1064,7 @@ export default function HRDashboard() {
           ) : (
             <div className="bg-card border border-border rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[700px] text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
                       <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Shift Name</th>
@@ -1114,13 +1118,13 @@ export default function HRDashboard() {
             TAB 6 — OFFICE LOCATIONS
         ════════════════════════════════════════════════════ */}
         <TabsContent value="locations" className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold text-foreground">Office Locations</h2>
               <p className="text-xs text-muted-foreground mt-0.5">Geo-fenced locations used for attendance check-in validation.</p>
             </div>
             {(employee?.role === "director" || employee?.role === "hr_head") && (
-              <Button size="sm" className="gap-2" onClick={() => setAddLocationOpen(true)}>
+              <Button size="sm" className="gap-2 w-full sm:w-auto" onClick={() => setAddLocationOpen(true)}>
                 <Plus className="w-4 h-4" /> Add Location
               </Button>
             )}
@@ -1137,7 +1141,7 @@ export default function HRDashboard() {
           ) : (
             <div className="bg-card border border-border rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[700px] text-sm">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
                       <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
@@ -1197,7 +1201,7 @@ export default function HRDashboard() {
           ADD / EDIT EMPLOYEE DIALOG
       ═══════════════════════════════════════════════ */}
       <Dialog open={dialogOpen} onOpenChange={v => { if (!v) resetForm(); setDialogOpen(v); }}>
-        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editTarget ? `Edit — ${editTarget.full_name}` : "Add New Employee"}</DialogTitle>
             {editTarget && (
@@ -1272,7 +1276,7 @@ export default function HRDashboard() {
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                 <span className="flex items-center gap-1"><IndianRupee className="w-3.5 h-3.5" /> Salary & Deductions</span>
               </p>
-              <div className="grid sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div><Label>Base Salary (₹/month)</Label>
                   <Input type="number" min="0" value={fSalary} onChange={e => setFSalary(e.target.value)} placeholder="e.g. 25000" />
                 </div>
@@ -1344,7 +1348,7 @@ export default function HRDashboard() {
           SALARY HISTORY DIALOG
       ═══════════════════════════════════════════════ */}
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Salary History — {historyEmp?.full_name}</DialogTitle>
             <p className="text-xs text-muted-foreground">{historyEmp?.employee_code} · Current: {fmtCurrency(historyEmp?.base_salary)}/mo</p>
@@ -1378,7 +1382,7 @@ export default function HRDashboard() {
           RESET PASSWORD DIALOG
       ═══════════════════════════════════════════════ */}
       <Dialog open={!!resetTarget} onOpenChange={v => { if (!v) setResetTarget(null); }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="w-[95vw] max-w-sm">
           <DialogHeader>
             <DialogTitle>Reset Password</DialogTitle>
             <p className="text-xs text-muted-foreground">{resetTarget?.full_name} · {resetTarget?.employee_code}</p>
@@ -1414,7 +1418,7 @@ export default function HRDashboard() {
           EDIT SHIFT DIALOG
       ═══════════════════════════════════════════════ */}
       <Dialog open={shiftDialogOpen} onOpenChange={v => { if (!v) { setShiftDialogOpen(false); setEditingShift(null); } }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Shift — {editingShift?.name}</DialogTitle>
           </DialogHeader>
@@ -1427,7 +1431,7 @@ export default function HRDashboard() {
                 placeholder="e.g. Morning Shift"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Start Time</Label>
                 <Input
@@ -1479,7 +1483,7 @@ export default function HRDashboard() {
           ADD SHIFT DIALOG
       ═══════════════════════════════════════════════ */}
       <Dialog open={addShiftOpen} onOpenChange={v => { if (!v) setAddShiftOpen(false); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Shift</DialogTitle>
           </DialogHeader>
@@ -1492,7 +1496,7 @@ export default function HRDashboard() {
                 placeholder="e.g. Morning Shift"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Start Time</Label>
                 <Input
@@ -1568,7 +1572,7 @@ export default function HRDashboard() {
           EDIT OFFICE LOCATION DIALOG
       ═══════════════════════════════════════════════ */}
       <Dialog open={locationDialogOpen} onOpenChange={v => { if (!v) { setLocationDialogOpen(false); setEditingLocation(null); } }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Location — {editingLocation?.name}</DialogTitle>
           </DialogHeader>
@@ -1589,7 +1593,7 @@ export default function HRDashboard() {
                 placeholder="Full address"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Latitude</Label>
                 <Input
@@ -1633,7 +1637,7 @@ export default function HRDashboard() {
           ADD OFFICE LOCATION DIALOG
       ═══════════════════════════════════════════════ */}
       <Dialog open={addLocationOpen} onOpenChange={v => { if (!v) setAddLocationOpen(false); }}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Office Location</DialogTitle>
           </DialogHeader>
@@ -1654,7 +1658,7 @@ export default function HRDashboard() {
                 placeholder="Full address"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Latitude</Label>
                 <Input

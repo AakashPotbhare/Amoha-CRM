@@ -19,6 +19,7 @@ import {
   CalendarDays,
   BadgeDollarSign,
   TrendingUp,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -40,11 +41,20 @@ interface NavItem {
   label: string;
 }
 
-export default function AppSidebar() {
+interface AppSidebarProps {
+  /** Called when a nav link is tapped on mobile — used to close the drawer */
+  onClose?: () => void;
+}
+
+export default function AppSidebar({ onClose }: AppSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const { employee, signOut } = useAuth();
   const access = useEmployeeAccess();
+  const role = employee?.role ?? "";
+  const showEnrollCandidate = ["director", "hr_head", "sales_head", "assistant_tl", "sales_executive"].includes(role);
+  const showCandidateBoard = !!access?.hasPermission("candidates.read");
+  const showSupportTaskCreator = ["director", "hr_head", "sales_head", "assistant_tl", "sales_executive", "lead_generator", "marketing_tl", "recruiter", "senior_recruiter", "resume_head", "resume_builder", "compliance_officer"].includes(role);
 
   // ─── Core nav (all authenticated employees) ──────────────────────────────
   const coreItems: NavItem[] = [
@@ -68,8 +78,10 @@ export default function AppSidebar() {
   // ─── Action shortcuts (permission-gated) ─────────────────────────────────
   const actionItems: NavItem[] = [];
 
-  if (access?.hasPermission("candidates.enroll") || access?.hasPermission("candidates.read")) {
+  if (showEnrollCandidate) {
     actionItems.push({ to: "/candidates/enroll", icon: UserPlus, label: "Enroll Candidate" });
+  }
+  if (showCandidateBoard) {
     actionItems.push({ to: "/candidates", icon: Users, label: "Candidates" });
   }
 
@@ -77,7 +89,7 @@ export default function AppSidebar() {
     actionItems.push({ to: "/my-queue", icon: Headphones, label: "My Queue" });
   }
 
-  if (access?.hasPermission("support_tasks.write")) {
+  if (showSupportTaskCreator) {
     actionItems.push({ to: "/tasks/create/support", icon: PlusCircle, label: "Create Support Task" });
   }
 
@@ -116,6 +128,7 @@ export default function AppSidebar() {
       <NavLink
         key={item.to}
         to={item.to}
+        onClick={() => onClose?.()}
         className={cn(
           "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
           isActive
@@ -151,13 +164,23 @@ export default function AppSidebar() {
         collapsed ? "w-16" : "w-60"
       )}
     >
-      {/* Logo */}
+      {/* Logo row — includes mobile close button */}
       <div className="flex items-center gap-3 px-4 h-16 border-b border-sidebar-border">
         <img src={amohaLogo} alt="Amoha" className="shrink-0 h-8 w-8 object-contain" />
         {!collapsed && (
-          <span className="font-semibold text-sidebar-active text-sm tracking-tight">
+          <span className="font-semibold text-sidebar-active text-sm tracking-tight flex-1 min-w-0">
             RecruitHub
           </span>
+        )}
+        {/* Close button — only visible when used as a mobile drawer (onClose prop present) */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="md:hidden ml-auto p-1 rounded-md text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-active transition-colors shrink-0"
+            aria-label="Close navigation menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
         )}
       </div>
 

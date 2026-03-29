@@ -227,20 +227,22 @@ export default function CreateSupportTask() {
   const selectClass = "w-full border border-input rounded-md px-3 py-2 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring";
 
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Create Support Task</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Schedule interviews, assessments, RUC, mock calls & preparation calls
-          </p>
+    <div className="p-4 md:p-6 lg:p-8 max-w-3xl mx-auto space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">Create Support Task</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Schedule interviews, assessments, RUC, mock calls & preparation calls
+            </p>
+          </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg p-6 space-y-5 card-elevated">
+      <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-5 card-elevated">
         {/* Task Type */}
         <div className="space-y-2">
           <Label htmlFor="taskType">Task Type *</Label>
@@ -252,7 +254,7 @@ export default function CreateSupportTask() {
         </div>
 
         {/* Candidate Selection */}
-        <div className="space-y-2">
+        <div className="space-y-2 col-span-full">
           <Label htmlFor="candidate">Candidate *</Label>
           <select
             id="candidate"
@@ -463,18 +465,18 @@ export default function CreateSupportTask() {
         </div>
 
         {/* Notes */}
-        <div className="space-y-2">
+        <div className="space-y-2 col-span-full">
           <Label htmlFor="notes">Notes for assigned person</Label>
           <Textarea id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Add any notes or special instructions..." rows={3} />
         </div>
 
         {/* Submit */}
-        <div className="flex gap-3 pt-2">
-          <Button type="submit" disabled={submitting || !candidateId}>
-            {submitting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Creating...</> : "Create Task"}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => navigate("/tasks/create")}>
+        <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2">
+          <Button type="button" variant="outline" onClick={() => navigate("/tasks/create")} className="w-full sm:w-auto">
             Cancel
+          </Button>
+          <Button type="submit" disabled={submitting || !candidateId} className="w-full sm:w-auto">
+            {submitting ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Creating...</> : "Create Task"}
           </Button>
         </div>
       </form>

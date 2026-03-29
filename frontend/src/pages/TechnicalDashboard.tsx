@@ -220,27 +220,31 @@ export default function TechnicalDashboard() {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Technical Support Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          View assigned support tasks and assign team members
-        </p>
+    <div className="p-3 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">Technical Support Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            View assigned support tasks and assign team members
+          </p>
+        </div>
       </div>
       <Tabs defaultValue="kanban" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="kanban">Support Tasks</TabsTrigger>
-          <TabsTrigger value="overview">All Tasks</TabsTrigger>
-          <TabsTrigger value="performance">Team Performance</TabsTrigger>
-          <TabsTrigger value="credentials">
-            <KeyRound className="w-4 h-4 mr-1.5" /> Candidate Credentials
-          </TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-1">
+          <TabsList className="flex w-max min-w-full">
+            <TabsTrigger className="whitespace-nowrap" value="kanban">Support Tasks</TabsTrigger>
+            <TabsTrigger className="whitespace-nowrap" value="overview">All Tasks</TabsTrigger>
+            <TabsTrigger className="whitespace-nowrap" value="performance">Team Performance</TabsTrigger>
+            <TabsTrigger className="whitespace-nowrap" value="credentials">
+              <KeyRound className="w-4 h-4 mr-1.5" /> Candidate Credentials
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* ── Kanban: 3-column status overview ── */}
         <TabsContent value="kanban" className="space-y-4">
           {/* KPI row */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6">
             {[
               { label: "Not Started", count: tasks.filter(t => !t.call_status || ["not_started","scheduled"].includes(t.call_status)).length, color: "text-warning", icon: Clock },
               { label: "Call Done", count: tasks.filter(t => ["link_sent","done","rescheduled"].includes(t.call_status || "")).length, color: "text-info", icon: MessageSquare },
@@ -256,9 +260,10 @@ export default function TechnicalDashboard() {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="overflow-x-auto">
+          <div className="flex flex-col md:flex-row gap-4 min-w-0">
             {/* Column 1: Link Pending */}
-            <div className="space-y-3">
+            <div className="space-y-3 flex-1 min-w-[280px]">
               <h3 className="text-sm font-semibold text-warning flex items-center gap-1.5">
                 <Clock className="w-4 h-4" /> Not Started / Scheduled
               </h3>
@@ -289,7 +294,7 @@ export default function TechnicalDashboard() {
             </div>
 
             {/* Column 2: Feedback Pending */}
-            <div className="space-y-3">
+            <div className="space-y-3 flex-1 min-w-[280px]">
               <h3 className="text-sm font-semibold text-info flex items-center gap-1.5">
                 <MessageSquare className="w-4 h-4" /> Feedback Pending
               </h3>
@@ -314,7 +319,7 @@ export default function TechnicalDashboard() {
             </div>
 
             {/* Column 3: Completed */}
-            <div className="space-y-3">
+            <div className="space-y-3 flex-1 min-w-[280px]">
               <h3 className="text-sm font-semibold text-success flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4" /> Completed
               </h3>
@@ -347,11 +352,12 @@ export default function TechnicalDashboard() {
               ))}
             </div>
           </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="overview" className="space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
         <div className="bg-card rounded-lg border border-border p-4">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-4 h-4 text-warning" />
@@ -383,7 +389,7 @@ export default function TechnicalDashboard() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center flex-wrap">
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={selectClass}>
           <option value="all">All Statuses</option>
           <option value="pending">Pending</option>
@@ -708,14 +714,14 @@ function CandidateCredentialsPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-lg font-semibold text-foreground">Candidate Credentials</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             Marketing / TL fills LinkedIn &amp; marketing access details here. Not visible on the enrollment form.
           </p>
         </div>
-        <div className="relative w-64">
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search candidates…"

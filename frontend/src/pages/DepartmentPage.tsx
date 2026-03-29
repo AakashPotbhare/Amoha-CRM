@@ -111,12 +111,14 @@ export default function DepartmentPage() {
   ];
 
   return (
-    <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">{deptName} Department</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Track candidates and performance for the {deptName} team
-        </p>
+    <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 md:space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">{deptName} Department</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Track candidates and performance for the {deptName} team
+          </p>
+        </div>
       </div>
 
       {/* Loading */}
@@ -136,7 +138,7 @@ export default function DepartmentPage() {
       {!loading && !error && (
         <>
           {/* Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {metrics.map((m) => (
               <div key={m.label} className="bg-card rounded-lg border border-border p-4 animate-fade-in">
                 <div className="flex items-center gap-2 mb-2">
@@ -149,13 +151,14 @@ export default function DepartmentPage() {
           </div>
 
           {/* Candidates table */}
-          <div className="bg-card rounded-lg border border-border overflow-x-auto">
-            <div className="p-5 border-b border-border">
+          <div className="bg-card rounded-lg border border-border overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-border">
               <h2 className="text-sm font-semibold text-card-foreground">
                 {deptName} Candidates ({candidates.length})
               </h2>
             </div>
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px]">
               <thead>
                 <tr className="border-b border-border text-left">
                   <th className="px-5 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Candidate</th>
@@ -190,6 +193,7 @@ export default function DepartmentPage() {
                 )}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       )}

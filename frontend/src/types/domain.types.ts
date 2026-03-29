@@ -188,7 +188,7 @@ export interface AttendanceBreak {
 // ─── Leave Management ────────────────────────────────────────────────────────
 
 export type LeaveType = 'paid' | 'unpaid' | 'sick' | 'casual';
-export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type LeaveStatus = 'pending' | 'tl_approved' | 'approved' | 'rejected' | 'cancelled';
 
 export interface LeaveRequest {
   id: string;

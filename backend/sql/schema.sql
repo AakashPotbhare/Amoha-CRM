@@ -165,6 +165,21 @@ CREATE TABLE IF NOT EXISTS support_tasks (
   FOREIGN KEY (created_by_employee_id)  REFERENCES employees(id)
 );
 
+CREATE TABLE IF NOT EXISTS candidate_resume_versions (
+  id                      CHAR(36)      NOT NULL DEFAULT (UUID()) PRIMARY KEY,
+  candidate_enrollment_id CHAR(36)      NOT NULL,
+  uploaded_by_employee_id CHAR(36)      NOT NULL,
+  support_task_id         CHAR(36)      NULL,
+  file_url                VARCHAR(500)  NOT NULL,
+  file_name               VARCHAR(255)  NOT NULL,
+  notes                   TEXT          NULL,
+  is_current              BOOLEAN       NOT NULL DEFAULT TRUE,
+  created_at              TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (candidate_enrollment_id) REFERENCES candidate_enrollments(id) ON DELETE CASCADE,
+  FOREIGN KEY (uploaded_by_employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+  FOREIGN KEY (support_task_id)         REFERENCES support_tasks(id) ON DELETE SET NULL
+);
+
 -- ─── General Tasks ────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS tasks (

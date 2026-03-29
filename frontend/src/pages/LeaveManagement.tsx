@@ -37,20 +37,26 @@ interface LeaveRequest {
   approved_by_manager: string | null;
   rejected_by: string | null;
   rejection_reason: string | null;
+  employee_name?: string;
+  employee_code?: string;
+  tl_approved_by_name?: string | null;
   employees?: { full_name: string; employee_code: string };
 }
 
 function normalizeLeaveRequest(request: any): LeaveRequest {
+  const startDate = request.start_date ?? request.from_date;
+  const endDate = request.end_date ?? request.to_date;
+
   return {
     id: request.id,
     employee_id: request.employee_id,
     leave_type: request.leave_type,
-    start_date: request.start_date,
-    end_date: request.end_date,
+    start_date: startDate,
+    end_date: endDate,
     total_days:
       typeof request.total_days === "number"
         ? request.total_days
-        : differenceInCalendarDays(parseISO(request.end_date), parseISO(request.start_date)) + 1,
+        : differenceInCalendarDays(parseISO(endDate), parseISO(startDate)) + 1,
     reason: request.reason ?? null,
     status: request.status,
     created_at: request.created_at,
@@ -58,6 +64,9 @@ function normalizeLeaveRequest(request: any): LeaveRequest {
     approved_by_manager: request.approved_by_manager ?? request.approved_by ?? null,
     rejected_by: request.rejected_by ?? null,
     rejection_reason: request.rejection_reason ?? null,
+    employee_name: request.employee_name,
+    employee_code: request.employee_code,
+    tl_approved_by_name: request.tl_approved_by_name ?? null,
     employees: request.employees,
   };
 }
@@ -71,7 +80,7 @@ export default function LeaveManagement() {
   const [loading, setLoading] = useState(false);
 
   // Form state
-  const [leaveType, setLeaveType] = useState<string>("annual");
+  const [leaveType, setLeaveType] = useState<string>("casual");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
@@ -96,8 +105,10 @@ export default function LeaveManagement() {
 
     // Pending approvals (for approvers)
     if (isApprover) {
-      const statusFilter = employee.role === "team_lead" ? "pending" : "pending,approved_by_tl";
-      const pendingRes = await api.get<LeaveRequest[]>(`/api/leaves?status=${statusFilter}`);
+      const isManagerApprover = ["director", "ops_head", "hr_head"].includes(employee.role);
+      const pendingRes = await api.get<LeaveRequest[]>(
+        isManagerApprover ? "/api/leaves/pending-manager" : "/api/leaves/pending-tl"
+      );
       if (pendingRes.success && pendingRes.data) {
         setPendingApprovals(pendingRes.data.map(normalizeLeaveRequest));
       }
@@ -118,7 +129,7 @@ export default function LeaveManagement() {
     if (!employee || !startDate || !endDate || totalDays <= 0) return;
     setLoading(true);
 
-    if (leaveType === "annual" && totalDays > paidAvailable) {
+    if (leaveType === "paid" && totalDays > paidAvailable) {
       toast({
         title: "Insufficient paid leave balance",
         description: `You have ${paidAvailable} paid leaves available but requested ${totalDays}.`,
@@ -132,10 +143,10 @@ export default function LeaveManagement() {
       await api.post("/api/leaves", {
         employee_id: employee.id,
         leave_type: leaveType,
-        start_date: startDate,
-        end_date: endDate,
+        from_date: startDate,
+        to_date: endDate,
         total_days: totalDays,
-        reason: reason || null,
+        reason: reason.trim(),
       });
       toast({ title: "Leave request submitted" });
       setStartDate("");
@@ -181,22 +192,24 @@ export default function LeaveManagement() {
   const statusBadge = (s: string) => {
     switch (s) {
       case "approved": return <Badge className="bg-emerald-100 text-emerald-800">Approved</Badge>;
-      case "approved_by_tl": return <Badge className="bg-blue-100 text-blue-800">TL Approved</Badge>;
+      case "tl_approved": return <Badge className="bg-blue-100 text-blue-800">TL Approved</Badge>;
       case "rejected": return <Badge variant="destructive">Rejected</Badge>;
       default: return <Badge variant="secondary">Pending</Badge>;
     }
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Leave Management</h1>
-        <p className="text-sm text-muted-foreground">Apply for leaves and track your balance</p>
+    <div className="p-3 sm:p-6 space-y-6 max-w-5xl mx-auto">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">Leave Management</h1>
+          <p className="text-sm text-muted-foreground">Apply for leaves and track your balance</p>
+        </div>
       </div>
 
       {/* Balance Card */}
       {balance && (
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card>
             <CardContent className="pt-4">
               <div className="text-sm text-muted-foreground mb-1">Paid Leave Available</div>
@@ -223,11 +236,13 @@ export default function LeaveManagement() {
       )}
 
       <Tabs defaultValue="apply">
-        <TabsList>
-          <TabsTrigger value="apply">Apply for Leave</TabsTrigger>
-          <TabsTrigger value="history">My Requests</TabsTrigger>
-          {isApprover && <TabsTrigger value="approvals">Approvals</TabsTrigger>}
-        </TabsList>
+        <div className="overflow-x-auto pb-1">
+          <TabsList className="flex w-max min-w-full">
+            <TabsTrigger value="apply" className="whitespace-nowrap">Apply for Leave</TabsTrigger>
+            <TabsTrigger value="history" className="whitespace-nowrap">My Requests</TabsTrigger>
+            {isApprover && <TabsTrigger value="approvals" className="whitespace-nowrap">Approvals</TabsTrigger>}
+          </TabsList>
+        </div>
 
         {/* Apply Tab */}
         <TabsContent value="apply">
@@ -239,19 +254,16 @@ export default function LeaveManagement() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <Label>Leave Type</Label>
                   <Select value={leaveType} onValueChange={setLeaveType}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="annual">Annual Leave</SelectItem>
-                      <SelectItem value="sick">Sick Leave</SelectItem>
                       <SelectItem value="casual">Casual Leave</SelectItem>
+                      <SelectItem value="paid">Paid Leave</SelectItem>
+                      <SelectItem value="sick">Sick Leave</SelectItem>
                       <SelectItem value="unpaid">Unpaid Leave</SelectItem>
-                      <SelectItem value="maternity">Maternity Leave</SelectItem>
-                      <SelectItem value="paternity">Paternity Leave</SelectItem>
-                      <SelectItem value="emergency">Emergency Leave</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -267,7 +279,7 @@ export default function LeaveManagement() {
               {totalDays > 0 && (
                 <p className="text-sm">
                   Total: <strong>{totalDays} day{totalDays > 1 ? "s" : ""}</strong>
-                  {leaveType === "annual" && totalDays > paidAvailable && (
+                  {leaveType === "paid" && totalDays > paidAvailable && (
                     <span className="text-destructive ml-2">Exceeds available balance</span>
                   )}
                   {totalDays >= 3 && (
@@ -279,7 +291,7 @@ export default function LeaveManagement() {
                 <Label>Reason (optional)</Label>
                 <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason for leave..." />
               </div>
-              <Button onClick={handleSubmit} disabled={loading || !startDate || !endDate || totalDays <= 0}>
+              <Button onClick={handleSubmit} disabled={loading || !startDate || !endDate || totalDays <= 0} className="w-full sm:w-auto">
                 Submit Leave Request
               </Button>
             </CardContent>
@@ -290,7 +302,8 @@ export default function LeaveManagement() {
         <TabsContent value="history">
           <Card>
             <CardContent className="pt-4">
-              <Table>
+              <div className="overflow-x-auto rounded-lg border">
+              <Table className="min-w-[600px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Type</TableHead>
@@ -320,6 +333,7 @@ export default function LeaveManagement() {
                   )}
                 </TableBody>
               </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -329,7 +343,8 @@ export default function LeaveManagement() {
           <TabsContent value="approvals">
             <Card>
               <CardContent className="pt-4">
-                <Table>
+                <div className="overflow-x-auto rounded-lg border">
+                <Table className="min-w-[700px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Employee</TableHead>
@@ -350,8 +365,8 @@ export default function LeaveManagement() {
                       pendingApprovals.map((r) => (
                         <TableRow key={r.id}>
                           <TableCell>
-                            <p className="font-medium text-xs">{r.employees?.full_name}</p>
-                            <p className="text-[10px] text-muted-foreground">{r.employees?.employee_code}</p>
+                            <p className="font-medium text-xs">{r.employee_name ?? r.employees?.full_name}</p>
+                            <p className="text-[10px] text-muted-foreground">{r.employee_code ?? r.employees?.employee_code}</p>
                           </TableCell>
                           <TableCell className="capitalize">{r.leave_type}</TableCell>
                           <TableCell className="text-xs">
@@ -361,12 +376,12 @@ export default function LeaveManagement() {
                           <TableCell className="text-xs max-w-[150px] truncate">{r.reason || "—"}</TableCell>
                           <TableCell>{statusBadge(r.status)}</TableCell>
                           <TableCell>
-                            <div className="flex gap-1">
+                            <div className="flex flex-wrap gap-1">
                               <Button size="sm" variant="ghost" onClick={() => handleApprove(r)} className="text-emerald-600 h-7 px-2">
-                                <CheckCircle className="w-3.5 h-3.5 mr-1" /> Approve
+                                <CheckCircle className="w-3.5 h-3.5 mr-1" /><span className="hidden sm:inline">Approve</span>
                               </Button>
                               <Button size="sm" variant="ghost" onClick={() => handleReject(r.id)} className="text-destructive h-7 px-2">
-                                <XCircle className="w-3.5 h-3.5 mr-1" /> Reject
+                                <XCircle className="w-3.5 h-3.5 mr-1" /><span className="hidden sm:inline">Reject</span>
                               </Button>
                             </div>
                           </TableCell>
@@ -375,6 +390,7 @@ export default function LeaveManagement() {
                     )}
                   </TableBody>
                 </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

@@ -125,12 +125,14 @@ export default function CreateTask() {
   const selectClass = "w-full border border-input rounded-md px-3 py-2 text-sm bg-background text-foreground";
 
   return (
-    <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Create Task</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Choose the type of task you want to create
-        </p>
+    <div className="p-4 md:p-6 lg:p-8 max-w-3xl mx-auto space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">Create Task</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Choose the type of task you want to create
+          </p>
+        </div>
       </div>
 
       {/* Task Type Selector Cards */}
@@ -169,7 +171,7 @@ export default function CreateTask() {
       </div>
 
       {/* General Task Form */}
-      <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg p-6 space-y-5 card-elevated">
+      <form onSubmit={handleSubmit} className="bg-card border border-border rounded-lg p-4 sm:p-6 space-y-5 card-elevated">
         <h2 className="text-lg font-semibold text-foreground">General Task</h2>
 
         {validationError && (
@@ -178,26 +180,28 @@ export default function CreateTask() {
           </div>
         )}
 
-        <div className="space-y-2">
-          <Label htmlFor="title">Task Title *</Label>
-          <Input
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Enter task title"
-            required
-          />
-        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2 col-span-full">
+            <Label htmlFor="title">Task Title *</Label>
+            <Input
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Enter task title"
+              required
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
-          <Textarea
-            id="description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe the task..."
-            rows={4}
-          />
+          <div className="space-y-2 col-span-full">
+            <Label htmlFor="description">Description</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe the task..."
+              rows={4}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -267,15 +271,16 @@ export default function CreateTask() {
             <p>Assignment is {(selectedDept || selectedTeam || selectedEmployee) ? "set" : "required (Department, Team, or Person)"}</p>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2">
+            <Button type="button" variant="outline" onClick={() => navigate("/")} className="w-full sm:w-auto">
+              Cancel
+            </Button>
             <Button
               type="submit"
               disabled={submitting || !title.trim() || (!selectedDept && !selectedTeam && !selectedEmployee)}
+              className="w-full sm:w-auto"
             >
               {submitting ? "Creating..." : "Create Task"}
-            </Button>
-            <Button type="button" variant="outline" onClick={() => navigate("/")}>
-              Cancel
             </Button>
           </div>
         </div>

@@ -1,43 +1,231 @@
+const fs = require('fs');
+const path = require('path');
+const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db');
 const { ok, created, notFound, badRequest, serverError } = require('../utils/response');
 
+const PIPELINE_STAGES = ['enrolled', 'resume_building', 'marketing_active', 'interview_stage', 'placed', 'rejected'];
+const SALES_ENROLL_ROLES = ['director', 'hr_head', 'sales_head', 'assistant_tl', 'sales_executive'];
+const GENERAL_EDIT_ROLES = ['director', 'hr_head', 'sales_head', 'assistant_tl', 'sales_executive'];
+const CREDENTIAL_EDIT_ROLES = ['director', 'hr_head', 'marketing_tl', 'recruiter', 'senior_recruiter'];
+const RESUME_UPLOAD_ROLES = ['director', 'hr_head', 'marketing_tl', 'recruiter', 'senior_recruiter', 'resume_head', 'resume_builder'];
+const CREDENTIAL_VIEW_ROLES = ['director', 'hr_head', 'marketing_tl', 'recruiter', 'senior_recruiter'];
+const RESUME_UPLOAD_DIR = path.join(__dirname, '../../uploads/candidate-resumes');
+let ensureResumeTablePromise = null;
+
+function buildBaseUrl() {
+  return process.env.BASE_URL || process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`;
+}
+
+function toInt(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+async function ensureResumeInfrastructure() {
+  if (!ensureResumeTablePromise) {
+    ensureResumeTablePromise = db.query(`
+      CREATE TABLE IF NOT EXISTS candidate_resume_versions (
+        id                     CHAR(36)      NOT NULL DEFAULT (UUID()) PRIMARY KEY,
+        candidate_enrollment_id CHAR(36)     NOT NULL,
+        uploaded_by_employee_id CHAR(36)     NOT NULL,
+        support_task_id        CHAR(36)      NULL,
+        file_url               VARCHAR(500)  NOT NULL,
+        file_name              VARCHAR(255)  NOT NULL,
+        notes                  TEXT          NULL,
+        is_current             BOOLEAN       NOT NULL DEFAULT TRUE,
+        created_at             TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (candidate_enrollment_id) REFERENCES candidate_enrollments(id) ON DELETE CASCADE,
+        FOREIGN KEY (uploaded_by_employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+        FOREIGN KEY (support_task_id)        REFERENCES support_tasks(id) ON DELETE SET NULL,
+        INDEX idx_resume_candidate (candidate_enrollment_id, created_at),
+        INDEX idx_resume_current (candidate_enrollment_id, is_current)
+      )
+    `);
+  }
+
+  await ensureResumeTablePromise;
+}
+
+const resumeStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    fs.mkdirSync(RESUME_UPLOAD_DIR, { recursive: true });
+    cb(null, RESUME_UPLOAD_DIR);
+  },
+  filename: (req, file, cb) => {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `${uuidv4()}-${safeName}`);
+  },
+});
+
+const resumeUpload = multer({
+  storage: resumeStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+function mapCandidateRow(c) {
+  return {
+    ...c,
+    interview_count: Number(c.interview_count || 0),
+    completed_interview_count: Number(c.completed_interview_count || 0),
+    resume_update_count: Number(c.resume_update_count || 0),
+  };
+}
+
+function roleIncludes(roleList, role) {
+  return roleList.includes(role);
+}
+
+function sanitizeCandidate(candidate, role) {
+  if (!candidate) return candidate;
+  const mapped = mapCandidateRow(candidate);
+  if (roleIncludes(CREDENTIAL_VIEW_ROLES, role)) return mapped;
+
+  const {
+    linkedin_email,
+    linkedin_passcode,
+    marketing_email,
+    marketing_email_password,
+    ssn_last4,
+    ...rest
+  } = mapped;
+
+  return rest;
+}
+
+async function fetchCandidateById(id) {
+  await ensureResumeInfrastructure();
+
+  const [[candidate]] = await db.query(
+    `SELECT ce.*,
+            e.full_name  AS enrolled_by_name,
+            sp.full_name AS salesperson_name,
+            COALESCE(interview_stats.interview_count, 0)         AS interview_count,
+            COALESCE(interview_stats.completed_interview_count, 0) AS completed_interview_count,
+            COALESCE(resume_stats.resume_update_count, 0)        AS resume_update_count,
+            resume_stats.current_resume_url,
+            resume_stats.current_resume_name,
+            resume_stats.current_resume_uploaded_at
+     FROM candidate_enrollments ce
+     LEFT JOIN employees e  ON ce.enrolled_by_employee_id = e.id
+     LEFT JOIN employees sp ON ce.salesperson_employee_id = sp.id
+     LEFT JOIN (
+       SELECT candidate_enrollment_id,
+              COUNT(*) AS interview_count,
+              SUM(CASE
+                    WHEN status = 'completed' OR call_status = 'completed' THEN 1
+                    ELSE 0
+                  END) AS completed_interview_count
+       FROM support_tasks
+       WHERE candidate_enrollment_id IS NOT NULL
+         AND task_type IN ('interview_support','assessment_support','mock_call','preparation_call')
+       GROUP BY candidate_enrollment_id
+     ) interview_stats ON interview_stats.candidate_enrollment_id = ce.id
+     LEFT JOIN (
+       SELECT candidate_enrollment_id,
+              COUNT(*) AS resume_update_count,
+              SUBSTRING_INDEX(
+                GROUP_CONCAT(CASE WHEN is_current = TRUE THEN file_url END ORDER BY created_at DESC SEPARATOR '||'),
+                '||',
+                1
+              ) AS current_resume_url,
+              SUBSTRING_INDEX(
+                GROUP_CONCAT(CASE WHEN is_current = TRUE THEN file_name END ORDER BY created_at DESC SEPARATOR '||'),
+                '||',
+                1
+              ) AS current_resume_name,
+              MAX(CASE WHEN is_current = TRUE THEN created_at END) AS current_resume_uploaded_at
+       FROM candidate_resume_versions
+       GROUP BY candidate_enrollment_id
+     ) resume_stats ON resume_stats.candidate_enrollment_id = ce.id
+     WHERE ce.id = ?`,
+    [id]
+  );
+
+  return candidate ? mapCandidateRow(candidate) : null;
+}
+
 // GET /api/candidates
 async function list(req, res) {
   try {
-    const { stage, search, enrolled_by, page = 1, limit = 20 } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    await ensureResumeInfrastructure();
+
+    const { stage, search, enrolled_by, page = 1, limit = 200 } = req.query;
+    const offset = (toInt(page, 1) - 1) * toInt(limit, 200);
     const params = [];
     const conditions = [];
 
-    if (stage)       { conditions.push('ce.pipeline_stage = ?');         params.push(stage); }
-    if (enrolled_by) { conditions.push('ce.enrolled_by_employee_id = ?'); params.push(enrolled_by); }
+    if (stage) {
+      conditions.push('ce.pipeline_stage = ?');
+      params.push(stage);
+    }
+    if (enrolled_by) {
+      conditions.push('ce.enrolled_by_employee_id = ?');
+      params.push(enrolled_by);
+    }
     if (search) {
-      conditions.push('(ce.full_name LIKE ? OR ce.phone LIKE ? OR ce.email LIKE ?)');
+      conditions.push('(ce.full_name LIKE ? OR ce.phone LIKE ? OR ce.email LIKE ? OR ce.current_domain LIKE ?)');
       const q = `%${search}%`;
-      params.push(q, q, q);
+      params.push(q, q, q, q);
     }
 
-    const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
     const [[{ total }]] = await db.query(
-      `SELECT COUNT(*) AS total FROM candidate_enrollments ce ${where}`, params
+      `SELECT COUNT(*) AS total FROM candidate_enrollments ce ${where}`,
+      params
     );
 
     const [rows] = await db.query(
       `SELECT ce.*,
               e.full_name  AS enrolled_by_name,
-              sp.full_name AS salesperson_name
+              sp.full_name AS salesperson_name,
+              COALESCE(interview_stats.interview_count, 0)           AS interview_count,
+              COALESCE(interview_stats.completed_interview_count, 0) AS completed_interview_count,
+              COALESCE(resume_stats.resume_update_count, 0)          AS resume_update_count,
+              resume_stats.current_resume_url,
+              resume_stats.current_resume_name,
+              resume_stats.current_resume_uploaded_at
        FROM candidate_enrollments ce
        LEFT JOIN employees e  ON ce.enrolled_by_employee_id = e.id
-       LEFT JOIN employees sp ON ce.salesperson_employee_id  = sp.id
+       LEFT JOIN employees sp ON ce.salesperson_employee_id = sp.id
+       LEFT JOIN (
+         SELECT candidate_enrollment_id,
+                COUNT(*) AS interview_count,
+                SUM(CASE
+                      WHEN status = 'completed' OR call_status = 'completed' THEN 1
+                      ELSE 0
+                    END) AS completed_interview_count
+         FROM support_tasks
+         WHERE candidate_enrollment_id IS NOT NULL
+           AND task_type IN ('interview_support','assessment_support','mock_call','preparation_call')
+         GROUP BY candidate_enrollment_id
+       ) interview_stats ON interview_stats.candidate_enrollment_id = ce.id
+       LEFT JOIN (
+         SELECT candidate_enrollment_id,
+                COUNT(*) AS resume_update_count,
+                SUBSTRING_INDEX(
+                  GROUP_CONCAT(CASE WHEN is_current = TRUE THEN file_url END ORDER BY created_at DESC SEPARATOR '||'),
+                  '||',
+                  1
+                ) AS current_resume_url,
+                SUBSTRING_INDEX(
+                  GROUP_CONCAT(CASE WHEN is_current = TRUE THEN file_name END ORDER BY created_at DESC SEPARATOR '||'),
+                  '||',
+                  1
+                ) AS current_resume_name,
+                MAX(CASE WHEN is_current = TRUE THEN created_at END) AS current_resume_uploaded_at
+         FROM candidate_resume_versions
+         GROUP BY candidate_enrollment_id
+       ) resume_stats ON resume_stats.candidate_enrollment_id = ce.id
        ${where}
-       ORDER BY ce.created_at DESC
+       ORDER BY ce.updated_at DESC, ce.created_at DESC
        LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), offset]
+      [...params, toInt(limit, 200), offset]
     );
 
-    return ok(res, rows, { total, page: parseInt(page), limit: parseInt(limit) });
+    return ok(res, rows.map(row => sanitizeCandidate(row, req.employee.role)), { total, page: toInt(page, 1), limit: toInt(limit, 200) });
   } catch (err) {
     return serverError(res, err);
   }
@@ -50,9 +238,8 @@ async function pipelineStats(req, res) {
       `SELECT pipeline_stage AS stage, COUNT(*) AS count
        FROM candidate_enrollments GROUP BY pipeline_stage`
     );
-    const stages = ['enrolled','resume_building','marketing_active','interview_stage','placed','rejected'];
-    const map = Object.fromEntries(stages.map(s => [s, 0]));
-    rows.forEach(r => { map[r.stage] = Number(r.count); });
+    const map = Object.fromEntries(PIPELINE_STAGES.map(stage => [stage, 0]));
+    rows.forEach(row => { map[row.stage] = Number(row.count); });
     return ok(res, map);
   } catch (err) {
     return serverError(res, err);
@@ -62,26 +249,96 @@ async function pipelineStats(req, res) {
 // GET /api/candidates/:id
 async function getOne(req, res) {
   try {
-    const [[candidate]] = await db.query(
-      `SELECT ce.*,
-              e.full_name  AS enrolled_by_name,
-              sp.full_name AS salesperson_name
-       FROM candidate_enrollments ce
-       LEFT JOIN employees e  ON ce.enrolled_by_employee_id = e.id
-       LEFT JOIN employees sp ON ce.salesperson_employee_id  = sp.id
-       WHERE ce.id = ?`,
-      [req.params.id]
-    );
+    const candidate = await fetchCandidateById(req.params.id);
     if (!candidate) return notFound(res, 'Candidate not found');
-    return ok(res, candidate);
+    return ok(res, sanitizeCandidate(candidate, req.employee.role));
   } catch (err) {
     return serverError(res, err);
   }
 }
 
+// GET /api/candidates/:id/resumes
+async function listResumes(req, res) {
+  try {
+    await ensureResumeInfrastructure();
+
+    const [rows] = await db.query(
+      `SELECT crv.*,
+              e.full_name AS uploaded_by_name,
+              e.employee_code AS uploaded_by_code
+       FROM candidate_resume_versions crv
+       LEFT JOIN employees e ON crv.uploaded_by_employee_id = e.id
+       WHERE crv.candidate_enrollment_id = ?
+       ORDER BY crv.created_at DESC`,
+      [req.params.id]
+    );
+
+    return ok(res, rows);
+  } catch (err) {
+    return serverError(res, err);
+  }
+}
+
+// POST /api/candidates/:id/resumes
+async function uploadResume(req, res) {
+  await ensureResumeInfrastructure();
+
+  resumeUpload.single('resume')(req, res, async (err) => {
+    if (err) return badRequest(res, err.message);
+
+    try {
+      if (!roleIncludes(RESUME_UPLOAD_ROLES, req.employee.role)) {
+        return res.status(403).json({ success: false, error: 'Only marketing, resume, HR, or director roles can upload candidate resumes' });
+      }
+      const { id } = req.params;
+      const { notes, support_task_id } = req.body;
+
+      const [[candidate]] = await db.query(
+        'SELECT id FROM candidate_enrollments WHERE id = ?',
+        [id]
+      );
+      if (!candidate) return notFound(res, 'Candidate not found');
+      if (!req.file) return badRequest(res, 'Resume file is required');
+
+      const versionId = uuidv4();
+      const fileUrl = `${buildBaseUrl()}/uploads/candidate-resumes/${req.file.filename}`;
+
+      await db.query(
+        'UPDATE candidate_resume_versions SET is_current = FALSE WHERE candidate_enrollment_id = ?',
+        [id]
+      );
+
+      await db.query(
+        `INSERT INTO candidate_resume_versions
+           (id, candidate_enrollment_id, uploaded_by_employee_id, support_task_id, file_url, file_name, notes, is_current)
+         VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)`,
+        [versionId, id, req.employee.id, support_task_id || null, fileUrl, req.file.originalname, notes || null]
+      );
+
+      const [[version]] = await db.query(
+        `SELECT crv.*,
+                e.full_name AS uploaded_by_name,
+                e.employee_code AS uploaded_by_code
+         FROM candidate_resume_versions crv
+         LEFT JOIN employees e ON crv.uploaded_by_employee_id = e.id
+         WHERE crv.id = ?`,
+        [versionId]
+      );
+
+      return created(res, version);
+    } catch (e) {
+      return serverError(res, e);
+    }
+  });
+}
+
 // POST /api/candidates
 async function enroll(req, res) {
   try {
+    if (!roleIncludes(SALES_ENROLL_ROLES, req.employee.role)) {
+      return res.status(403).json({ success: false, error: 'Only sales roles, HR, or director can enroll candidates' });
+    }
+
     const {
       full_name, phone, email,
       dob, date_of_birth,
@@ -111,7 +368,6 @@ async function enroll(req, res) {
       salary_expectations,
       notes,
       pipeline_stage,
-      // Plan & Payment
       plan_type,
       plan_price,
       discount_amount,
@@ -121,12 +377,10 @@ async function enroll(req, res) {
       installment_2_paid_date,
       next_payment_date,
       next_payment_amount,
-      // Referral & Sales
       referred_by_name,
       referral_bonus_amount,
       salesperson_employee_id,
       lead_person_name,
-      // Payment methods (array: ['stripe','zelle','account_transfer'])
       payment_methods,
     } = req.body;
 
@@ -134,15 +388,14 @@ async function enroll(req, res) {
       return badRequest(res, 'full_name and phone are required');
     }
 
-    const resolvedDob         = dob || date_of_birth || null;
-    const resolvedVisaStatus  = visa_status || visa_type || null;
-    const resolvedVisaExpire  = visa_expire_date || visa_expiry || null;
+    const resolvedDob = dob || date_of_birth || null;
+    const resolvedVisaStatus = visa_status || visa_type || null;
+    const resolvedVisaExpire = visa_expire_date || visa_expiry || null;
     const resolvedLocationZip = current_location_zip || current_location || null;
-    const resolvedDomain      = current_domain || technology || profession || null;
-    const resolvedYrsExp      = years_experience || experience_years || null;
-    const resolvedStage       = pipeline_stage || 'enrolled';
+    const resolvedDomain = current_domain || technology || profession || null;
+    const resolvedYrsExp = years_experience || experience_years || null;
+    const resolvedStage = pipeline_stage || 'enrolled';
 
-    // Serialize payment_methods array → JSON
     const resolvedPaymentMethods = payment_methods
       ? JSON.stringify(Array.isArray(payment_methods) ? payment_methods : [payment_methods])
       : null;
@@ -197,30 +450,24 @@ async function enroll(req, res) {
       ]
     );
 
-    // Notify salesperson of successful enrollment
     if (salesperson_employee_id) {
       try {
         const { createNotification } = require('../services/notification.service');
         await createNotification(db, {
           recipient_id: salesperson_employee_id,
           title: `New Candidate Enrolled: ${full_name}`,
-          body: `A new candidate has been enrolled under your account.`,
+          body: 'A new candidate has been enrolled under your account.',
           type: 'success',
           entity_type: 'candidate_enrollment',
           entity_id: id,
         });
-      } catch (_) { /* non-blocking */ }
+      } catch (_) {
+        // non-blocking
+      }
     }
 
-    const [[candidate]] = await db.query(
-      `SELECT ce.*, e.full_name AS enrolled_by_name, sp.full_name AS salesperson_name
-       FROM candidate_enrollments ce
-       LEFT JOIN employees e  ON ce.enrolled_by_employee_id = e.id
-       LEFT JOIN employees sp ON ce.salesperson_employee_id  = sp.id
-       WHERE ce.id = ?`,
-      [id]
-    );
-    return created(res, candidate);
+    const candidate = await fetchCandidateById(id);
+    return created(res, sanitizeCandidate(candidate, req.employee.role));
   } catch (err) {
     return serverError(res, err);
   }
@@ -229,56 +476,54 @@ async function enroll(req, res) {
 // PATCH /api/candidates/:id
 async function update(req, res) {
   try {
-    const allowed = [
-      'full_name','phone','email','dob',
-      'gender','visa_status','visa_expire_date','ead_start_date','ead_end_date',
-      'current_location_zip','nearest_metro_area','open_for_relocation','native_country',
-      'current_domain','years_experience',
-      'veteran_status','security_clearance','race_ethnicity','total_certifications',
+    const generalAllowed = [
+      'full_name', 'phone', 'email', 'dob',
+      'gender', 'visa_status', 'visa_expire_date', 'ead_start_date', 'ead_end_date',
+      'current_location_zip', 'nearest_metro_area', 'open_for_relocation', 'native_country',
+      'current_domain', 'years_experience',
+      'veteran_status', 'security_clearance', 'race_ethnicity', 'total_certifications',
       'highest_qualification',
-      'bachelors_field','bachelors_university','bachelors_start_date','bachelors_end_date',
-      'masters_field','masters_university','masters_start_date','masters_end_date',
-      'linkedin_email','linkedin_passcode','ssn_last4',
-      'marketing_email','marketing_email_password',
-      'availability_for_calls','availability_to_start','arrived_in_usa',
-      'salary_expectations','notes',
-      // Plan & Payment
-      'plan_type','plan_price','discount_amount',
-      'installment_1_amount','installment_1_paid_date',
-      'installment_2_amount','installment_2_paid_date',
-      'next_payment_date','next_payment_amount',
-      // Referral & Sales
-      'referred_by_name','referral_bonus_amount',
-      'salesperson_employee_id','lead_person_name',
-      'payment_methods',
+      'bachelors_field', 'bachelors_university', 'bachelors_start_date', 'bachelors_end_date',
+      'masters_field', 'masters_university', 'masters_start_date', 'masters_end_date',
+      'availability_for_calls', 'availability_to_start', 'arrived_in_usa',
+      'salary_expectations', 'notes',
+      'plan_type', 'plan_price', 'discount_amount',
+      'installment_1_amount', 'installment_1_paid_date',
+      'installment_2_amount', 'installment_2_paid_date',
+      'next_payment_date', 'next_payment_amount',
+      'referred_by_name', 'referral_bonus_amount',
+      'salesperson_employee_id', 'lead_person_name',
+      'payment_methods', 'pipeline_stage',
+    ];
+    const credentialAllowed = ['linkedin_email', 'linkedin_passcode', 'ssn_last4', 'marketing_email', 'marketing_email_password'];
+    const allowed = [
+      ...(roleIncludes(GENERAL_EDIT_ROLES, req.employee.role) ? generalAllowed : []),
+      ...(roleIncludes(CREDENTIAL_EDIT_ROLES, req.employee.role) ? credentialAllowed : []),
     ];
 
-    const fields = Object.keys(req.body).filter(k => allowed.includes(k));
+    if (!allowed.length) {
+      return res.status(403).json({ success: false, error: 'You do not have permission to update this candidate' });
+    }
+
+    const fields = Object.keys(req.body).filter(key => allowed.includes(key));
     if (!fields.length) return badRequest(res, 'No valid fields to update');
 
-    const values = fields.map(f => {
-      if (f === 'payment_methods') {
-        const v = req.body[f];
-        return v ? JSON.stringify(Array.isArray(v) ? v : [v]) : null;
+    const values = fields.map(field => {
+      if (field === 'payment_methods') {
+        const value = req.body[field];
+        return value ? JSON.stringify(Array.isArray(value) ? value : [value]) : null;
       }
-      return req.body[f];
+      return req.body[field];
     });
 
     await db.query(
-      `UPDATE candidate_enrollments SET ${fields.map(f => `\`${f}\` = ?`).join(', ')} WHERE id = ?`,
+      `UPDATE candidate_enrollments SET ${fields.map(field => `\`${field}\` = ?`).join(', ')} WHERE id = ?`,
       [...values, req.params.id]
     );
 
-    const [[candidate]] = await db.query(
-      `SELECT ce.*, e.full_name AS enrolled_by_name, sp.full_name AS salesperson_name
-       FROM candidate_enrollments ce
-       LEFT JOIN employees e  ON ce.enrolled_by_employee_id = e.id
-       LEFT JOIN employees sp ON ce.salesperson_employee_id  = sp.id
-       WHERE ce.id = ?`,
-      [req.params.id]
-    );
+    const candidate = await fetchCandidateById(req.params.id);
     if (!candidate) return notFound(res, 'Candidate not found');
-    return ok(res, candidate);
+    return ok(res, sanitizeCandidate(candidate, req.employee.role));
   } catch (err) {
     return serverError(res, err);
   }
@@ -287,11 +532,9 @@ async function update(req, res) {
 // PATCH /api/candidates/:id/stage
 async function updateStage(req, res) {
   try {
-    const validStages = ['enrolled','resume_building','marketing_active','interview_stage','placed','rejected'];
     const { stage } = req.body;
-
-    if (!validStages.includes(stage)) {
-      return badRequest(res, `Invalid stage. Must be one of: ${validStages.join(', ')}`);
+    if (!PIPELINE_STAGES.includes(stage)) {
+      return badRequest(res, `Invalid stage. Must be one of: ${PIPELINE_STAGES.join(', ')}`);
     }
 
     await db.query(
@@ -299,35 +542,35 @@ async function updateStage(req, res) {
       [stage, req.params.id]
     );
 
-    const [[candidate]] = await db.query(
-      'SELECT id, full_name, pipeline_stage FROM candidate_enrollments WHERE id = ?',
-      [req.params.id]
-    );
+    const candidate = await fetchCandidateById(req.params.id);
     if (!candidate) return notFound(res, 'Candidate not found');
-    return ok(res, candidate);
+    return ok(res, sanitizeCandidate(candidate, req.employee.role));
   } catch (err) {
     return serverError(res, err);
   }
 }
 
-// PATCH /api/candidates/:id/credentials  — TL/marketing fills LinkedIn & marketing creds
+// PATCH /api/candidates/:id/credentials
 async function updateCredentials(req, res) {
   try {
-    const allowed = ['linkedin_email','linkedin_passcode','ssn_last4','marketing_email','marketing_email_password'];
-    const fields  = Object.keys(req.body).filter(k => allowed.includes(k));
+    if (!roleIncludes(CREDENTIAL_EDIT_ROLES, req.employee.role)) {
+      return res.status(403).json({ success: false, error: 'Only marketing roles, HR, or director can update candidate credentials' });
+    }
+    const allowed = ['linkedin_email', 'linkedin_passcode', 'ssn_last4', 'marketing_email', 'marketing_email_password'];
+    const fields = Object.keys(req.body).filter(key => allowed.includes(key));
     if (!fields.length) return badRequest(res, 'No credential fields provided');
 
     await db.query(
-      `UPDATE candidate_enrollments SET ${fields.map(f => `\`${f}\` = ?`).join(', ')} WHERE id = ?`,
-      [...fields.map(f => req.body[f]), req.params.id]
+      `UPDATE candidate_enrollments SET ${fields.map(field => `\`${field}\` = ?`).join(', ')} WHERE id = ?`,
+      [...fields.map(field => req.body[field]), req.params.id]
     );
 
     const [[candidate]] = await db.query(
-      'SELECT id, full_name, linkedin_email, ssn_last4, marketing_email FROM candidate_enrollments WHERE id = ?',
+      'SELECT id, full_name, linkedin_email, linkedin_passcode, ssn_last4, marketing_email, marketing_email_password FROM candidate_enrollments WHERE id = ?',
       [req.params.id]
     );
     if (!candidate) return notFound(res, 'Candidate not found');
-    return ok(res, candidate);
+    return ok(res, sanitizeCandidate(candidate, req.employee.role));
   } catch (err) {
     return serverError(res, err);
   }
@@ -336,12 +579,13 @@ async function updateCredentials(req, res) {
 // DELETE /api/candidates/:id
 async function remove(req, res) {
   try {
-    const { id } = req.params;
-    const isAdmin = ['director','hr_head'].includes(req.employee.role);
-    if (!isAdmin) return res.status(403).json({ error: 'Only directors can delete candidates' });
-    const [rows] = await db.query('SELECT id FROM candidate_enrollments WHERE id = ?', [id]);
+    const isAdmin = ['director', 'hr_head'].includes(req.employee.role);
+    if (!isAdmin) return badRequest(res, 'Only directors or HR Head can delete candidates');
+
+    const [rows] = await db.query('SELECT id FROM candidate_enrollments WHERE id = ?', [req.params.id]);
     if (!rows.length) return notFound(res, 'Candidate not found');
-    await db.query('DELETE FROM candidate_enrollments WHERE id = ?', [id]);
+
+    await db.query('DELETE FROM candidate_enrollments WHERE id = ?', [req.params.id]);
     return ok(res, { message: 'Candidate deleted' });
   } catch (err) {
     console.error('candidates.remove error:', err);
@@ -349,4 +593,15 @@ async function remove(req, res) {
   }
 }
 
-module.exports = { list, pipelineStats, getOne, enroll, update, updateStage, updateCredentials, remove };
+module.exports = {
+  list,
+  pipelineStats,
+  getOne,
+  listResumes,
+  uploadResume,
+  enroll,
+  update,
+  updateStage,
+  updateCredentials,
+  remove,
+};

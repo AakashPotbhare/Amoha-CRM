@@ -41,9 +41,9 @@ export async function getLeaveBalance(employeeId: string, year: number): Promise
 export async function submitLeaveRequest(input: LeaveRequestInput): Promise<LeaveRequest> {
   const res = await api.post<LeaveRequest>('/api/leaves', {
     leave_type: input.leaveType,
-    date_from:  input.fromDate,
-    date_to:    input.toDate,
-    reason:     input.reason,
+    from_date:  input.fromDate,
+    to_date:    input.toDate,
+    reason:     input.reason.trim(),
   });
   return res.data;
 }

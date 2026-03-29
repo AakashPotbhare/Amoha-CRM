@@ -58,9 +58,13 @@ function AuthLoader() {
 function ProtectedRoute({
   children,
   requiredPermission,
+  allowedRoles,
+  departmentSlug,
 }: {
   children: React.ReactNode;
   requiredPermission?: Permission;
+  allowedRoles?: EmployeeRole[];
+  departmentSlug?: string;
 }) {
   const { employee, loading } = useAuth();
 
@@ -70,6 +74,17 @@ function ProtectedRoute({
   if (requiredPermission) {
     const allowed = hasPermission(employee.role as EmployeeRole, requiredPermission);
     if (!allowed) return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(employee.role as EmployeeRole)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (departmentSlug) {
+    const canViewDepartment =
+      ["director", "ops_head", "hr_head"].includes(employee.role) ||
+      employee.departments?.slug === departmentSlug;
+    if (!canViewDepartment) return <Navigate to="/unauthorized" replace />;
   }
 
   return <>{children}</>;
@@ -125,7 +140,10 @@ const App = () => (
                       <Route
                         path="/tasks/create/support"
                         element={
-                          <ProtectedRoute requiredPermission="support_tasks.write">
+                          <ProtectedRoute
+                            requiredPermission="support_tasks.write"
+                            allowedRoles={["director", "hr_head", "sales_head", "assistant_tl", "sales_executive", "lead_generator", "marketing_tl", "recruiter", "senior_recruiter", "resume_head", "resume_builder", "compliance_officer"]}
+                          >
                             <CreateSupportTask />
                           </ProtectedRoute>
                         }
@@ -135,7 +153,10 @@ const App = () => (
                       <Route
                         path="/candidates/enroll"
                         element={
-                          <ProtectedRoute requiredPermission="candidates.enroll">
+                          <ProtectedRoute
+                            requiredPermission="candidates.enroll"
+                            allowedRoles={["director", "hr_head", "sales_head", "assistant_tl", "sales_executive"]}
+                          >
                             <CandidateEnrollment />
                           </ProtectedRoute>
                         }
@@ -150,11 +171,11 @@ const App = () => (
                       />
 
                       {/* Department dashboards */}
-                      <Route path="/departments/sales" element={<SalesDashboard />} />
-                      <Route path="/departments/resume" element={<ResumeDashboard />} />
-                      <Route path="/departments/marketing" element={<MarketingDepartment />} />
-                      <Route path="/departments/technical" element={<TechnicalDashboard />} />
-                      <Route path="/departments/compliance" element={<ComplianceDashboard />} />
+                      <Route path="/departments/sales" element={<ProtectedRoute departmentSlug="sales"><SalesDashboard /></ProtectedRoute>} />
+                      <Route path="/departments/resume" element={<ProtectedRoute departmentSlug="resume"><ResumeDashboard /></ProtectedRoute>} />
+                      <Route path="/departments/marketing" element={<ProtectedRoute departmentSlug="marketing"><MarketingDepartment /></ProtectedRoute>} />
+                      <Route path="/departments/technical" element={<ProtectedRoute departmentSlug="technical"><TechnicalDashboard /></ProtectedRoute>} />
+                      <Route path="/departments/compliance" element={<ProtectedRoute departmentSlug="compliance"><ComplianceDashboard /></ProtectedRoute>} />
 
                       {/* My Queue — support staff */}
                       <Route path="/my-queue" element={<MySupportQueue />} />

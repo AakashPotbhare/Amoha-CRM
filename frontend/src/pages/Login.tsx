@@ -48,10 +48,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md space-y-8">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+      <div className="w-full max-w-sm space-y-8">
         {/* Logo & Company */}
-        <div className="text-center space-y-3">
+        <div className="text-center space-y-3 mb-6">
           <img src={amohaLogo} alt="Amoha Recruitment Services" className="mx-auto h-16 w-auto" />
           <div>
             <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-accent-foreground bg-clip-text text-transparent">
@@ -83,7 +83,7 @@ export default function Login() {
                         placeholder="ARS202301"
                         value={employeeCode}
                         onChange={(e) => setEmployeeCode(e.target.value.toUpperCase())}
-                        className="pl-10 uppercase"
+                        className="pl-10 uppercase w-full"
                         autoComplete="username"
                         maxLength={20}
                       />
@@ -99,6 +99,7 @@ export default function Login() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       autoComplete="current-password"
+                      className="w-full"
                     />
                   </div>
 

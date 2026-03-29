@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
-  PlusCircle, Eye, IndianRupee, Calendar, Building2,
+  PlusCircle, Eye, DollarSign, Calendar, Building2,
   CheckCircle2, Clock, XCircle, AlertCircle, Loader2, Trash2,
 } from "lucide-react";
 import {
@@ -76,12 +76,12 @@ const STATUS_CONFIG: Record<string, { label: string; className: string; icon: Re
 
 function fmt(n: number | null | undefined) {
   if (n == null) return "—";
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 }
 
 function fmtDate(s: string | null | undefined) {
   if (!s) return "—";
-  return new Date(s).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(s).toLocaleDateString("en-US", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default function PlacementOffers() {
@@ -180,23 +180,25 @@ export default function PlacementOffers() {
   const totals = stats?.totals;
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="p-4 md:p-6 lg:p-8 space-y-4 md:space-y-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Placement Offers</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-foreground">Placement Offers</h1>
           <p className="text-sm text-muted-foreground mt-1">Track all candidate placements and installment payments</p>
         </div>
         {canCreate && (
-          <Button onClick={() => navigate("/placement-orders/create")} className="gap-2">
-            <PlusCircle className="w-4 h-4" /> New Placement Offer
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button onClick={() => navigate("/placement-orders/create")} className="gap-2">
+              <PlusCircle className="w-4 h-4" /> New Placement Offer
+            </Button>
+          </div>
         )}
       </div>
 
       {/* Stats summary */}
       {totals && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: "Total POs",      value: totals.total_pos,      currency: false },
             { label: "Total Package",  value: totals.total_package,  currency: true },
@@ -214,7 +216,7 @@ export default function PlacementOffers() {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center flex-wrap">
         <Input
           placeholder="Search candidate, employer, technology..."
           value={search}
@@ -251,13 +253,13 @@ export default function PlacementOffers() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
-          <IndianRupee className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <DollarSign className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p className="font-medium">No placement offers found</p>
         </div>
       ) : (
         <div className="bg-card border border-border rounded-lg card-elevated overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-lg border-0">
+            <table className="w-full text-sm min-w-[900px]">
               <thead className="bg-muted/40 border-b border-border">
                 <tr>
                   {["Candidate", "Technology", "Employer", "Offer Date", "Package", "Final Due", "Status", ""].map(h => (
@@ -335,9 +337,9 @@ export default function PlacementOffers() {
 
       {/* Detail Modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setSelected(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4" onClick={() => setSelected(null)}>
           <div
-            className="bg-background border border-border rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4"
+            className="bg-background border border-border rounded-xl shadow-2xl w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             {/* Modal header */}
@@ -351,7 +353,7 @@ export default function PlacementOffers() {
 
             <div className="p-6 space-y-6">
               {/* Key details grid */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   { label: "Technology",       value: selected.technology },
                   { label: "Employment Type",  value: selected.employment_type.replace(/_/g, " ").toUpperCase() },

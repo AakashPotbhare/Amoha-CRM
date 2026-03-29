@@ -18,6 +18,7 @@ function entityPath(entity_type: string | null): string {
   if (entity_type === "support_task") return "/my-queue";
   if (entity_type === "task")         return "/tasks/inbox";
   if (entity_type === "placement_offer") return "/placement-orders";
+  if (entity_type === "leave_request") return "/leaves";
   return "/";
 }
 
@@ -132,7 +133,7 @@ export default function NotificationBell() {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 rounded-lg border border-border bg-popover shadow-xl z-50 overflow-hidden">
+        <div className="absolute right-0 top-full mt-2 w-[calc(100vw-1rem)] max-w-sm md:w-80 rounded-lg border border-border bg-popover shadow-xl z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <h3 className="text-sm font-semibold text-foreground">
@@ -198,7 +199,7 @@ export default function NotificationBell() {
                     />
                     <div className="min-w-0 flex-1">
                       <p
-                        className={`text-sm leading-snug ${
+                        className={`text-sm leading-snug truncate ${
                           n.is_read ? "text-muted-foreground" : "font-medium text-foreground"
                         }`}
                       >
