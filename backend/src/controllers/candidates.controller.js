@@ -4,9 +4,10 @@ const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../config/db');
 const { ok, created, notFound, badRequest, serverError } = require('../utils/response');
+const { createNotification } = require('../services/notification.service');
 
 const PIPELINE_STAGES = ['enrolled', 'resume_building', 'marketing_active', 'interview_stage', 'placed', 'rejected'];
-const SALES_ENROLL_ROLES = ['director', 'hr_head', 'sales_head', 'assistant_tl', 'sales_executive'];
+const SALES_ENROLL_ROLES = ['director', 'hr_head', 'sales_head', 'assistant_tl', 'sales_executive', 'lead_generator'];
 const GENERAL_EDIT_ROLES = ['director', 'hr_head', 'sales_head', 'assistant_tl', 'sales_executive'];
 const CREDENTIAL_EDIT_ROLES = ['director', 'hr_head', 'marketing_tl', 'recruiter', 'senior_recruiter'];
 const RESUME_UPLOAD_ROLES = ['director', 'hr_head', 'marketing_tl', 'recruiter', 'senior_recruiter', 'resume_head', 'resume_builder'];
@@ -315,6 +316,54 @@ async function uploadResume(req, res) {
         [versionId, id, req.employee.id, support_task_id || null, fileUrl, req.file.originalname, notes || null]
       );
 
+      if (support_task_id) {
+        const uploadMessage = [
+          `${req.employee.full_name} uploaded a new resume version`,
+          req.file.originalname ? `(${req.file.originalname})` : '',
+          notes ? `- ${notes}` : '',
+        ].filter(Boolean).join(' ');
+
+        await db.query(
+          `UPDATE support_tasks
+           SET status = 'completed'
+           WHERE id = ?`,
+          [support_task_id]
+        );
+
+        await db.query(
+          'INSERT INTO task_comments (id, support_task_id, employee_id, content) VALUES (?, ?, ?, ?)',
+          [uuidv4(), support_task_id, req.employee.id, uploadMessage]
+        );
+
+        const [[task]] = await db.query(
+          `SELECT st.id,
+                  st.assigned_to_employee_id,
+                  st.created_by_employee_id,
+                  COALESCE(ce.full_name, st.candidate_name) AS candidate_name
+           FROM support_tasks st
+           LEFT JOIN candidate_enrollments ce ON ce.id = st.candidate_enrollment_id
+           WHERE st.id = ?`,
+          [support_task_id]
+        );
+
+        const recipients = Array.from(new Set(
+          [task?.created_by_employee_id, task?.assigned_to_employee_id].filter(
+            (recipientId) => recipientId && recipientId !== req.employee.id
+          )
+        ));
+
+        await Promise.all(recipients.map((recipientId) => createNotification(db, {
+          recipient_id: recipientId,
+          title: 'Resume task completed',
+          body: task?.candidate_name
+            ? `Updated resume uploaded for ${task.candidate_name}`
+            : 'An updated candidate resume was uploaded',
+          type: 'success',
+          entity_type: 'support_task',
+          entity_id: support_task_id,
+        })));
+      }
+
       const [[version]] = await db.query(
         `SELECT crv.*,
                 e.full_name AS uploaded_by_name,
@@ -330,6 +379,42 @@ async function uploadResume(req, res) {
       return serverError(res, e);
     }
   });
+}
+
+// DELETE /api/candidates/:id/resumes/:resumeId
+async function deleteResume(req, res) {
+  try {
+    const { id, resumeId } = req.params;
+
+    if (!roleIncludes(RESUME_UPLOAD_ROLES, req.employee.role)) {
+      return res.status(403).json({ success: false, error: 'Insufficient permissions to delete resume versions' });
+    }
+
+    const [[version]] = await db.query(
+      'SELECT id, is_current, file_url FROM candidate_resume_versions WHERE id = ? AND candidate_enrollment_id = ?',
+      [resumeId, id]
+    );
+    if (!version) return notFound(res, 'Resume version not found');
+
+    // Delete the record
+    await db.query('DELETE FROM candidate_resume_versions WHERE id = ?', [resumeId]);
+
+    // If it was the current version, promote the most recent remaining version
+    if (version.is_current) {
+      await db.query(
+        `UPDATE candidate_resume_versions
+         SET is_current = TRUE
+         WHERE candidate_enrollment_id = ?
+         ORDER BY created_at DESC
+         LIMIT 1`,
+        [id]
+      );
+    }
+
+    return ok(res, { deleted: true });
+  } catch (err) {
+    return serverError(res, err);
+  }
 }
 
 // POST /api/candidates
@@ -599,6 +684,7 @@ module.exports = {
   getOne,
   listResumes,
   uploadResume,
+  deleteResume,
   enroll,
   update,
   updateStage,

@@ -6,7 +6,8 @@ const { ok, created, notFound, badRequest, serverError } = require('../utils/res
 
 const LEAVE_TYPES = ['paid', 'unpaid', 'sick', 'casual'];
 const TL_ROLES = ['marketing_tl', 'sales_head', 'technical_head', 'resume_head', 'assistant_tl'];
-const MGR_ROLES = ['ops_head', 'hr_head', 'director'];
+const MGR_ROLES = ['ops_head'];
+const WATCHER_ROLES = ['ops_head', 'hr_head'];
 const DEPT_HEAD_ROLE = {
   sales: 'sales_head',
   technical: 'technical_head',
@@ -37,17 +38,16 @@ async function getLeaveRequestById(id) {
   return request;
 }
 
-async function getManagementApprovers(excludeEmployeeId) {
+async function getWatcherRecipients(excludeEmployeeIds = []) {
   const [rows] = await db.query(
     `SELECT id, full_name, role
      FROM employees
      WHERE is_active = 1
-       AND role IN (?)
-       AND id <> ?`,
-    [MGR_ROLES, excludeEmployeeId]
+       AND role IN (?)`,
+    [WATCHER_ROLES]
   );
 
-  return rows;
+  return rows.filter(row => !excludeEmployeeIds.includes(row.id));
 }
 
 async function getTlApproversForEmployee(employee) {
@@ -98,16 +98,65 @@ async function getTlApproversForEmployee(employee) {
 }
 
 async function getLeaveApprovers(employee) {
-  const [tlApprovers, managementApprovers] = await Promise.all([
-    getTlApproversForEmployee(employee),
-    getManagementApprovers(employee.id),
-  ]);
+  const managerApprover = await getPrimaryManagerForEmployee(employee);
+  const watcherRecipients = await getWatcherRecipients([employee.id, managerApprover?.id].filter(Boolean));
+  return { managerApprover, watcherRecipients };
+}
 
-  const uniqueRecipients = [...new Map(
-    [...tlApprovers, ...managementApprovers].map(approver => [approver.id, approver])
-  ).values()];
+async function getPrimaryManagerForEmployee(employee) {
+  if (!employee || employee.role === 'director') {
+    return null;
+  }
 
-  return { tlApprovers, managementApprovers, uniqueRecipients };
+  if (['ops_head', 'hr_head', 'sales_head', 'technical_head', 'marketing_tl', 'resume_head'].includes(employee.role)) {
+    const [rows] = await db.query(
+      `SELECT id, full_name, role
+       FROM employees
+       WHERE is_active = 1
+         AND role = 'ops_head'
+         AND id <> ?
+       ORDER BY created_at ASC
+       LIMIT 1`,
+      [employee.id]
+    );
+    return rows[0] || null;
+  }
+
+  if (employee.role === 'assistant_tl') {
+    const preferredRole = DEPT_HEAD_ROLE[employee.dept_slug];
+    if (preferredRole) {
+      const [rows] = await db.query(
+        `SELECT id, full_name, role
+         FROM employees
+         WHERE is_active = 1
+           AND department_id = ?
+           AND role = ?
+           AND id <> ?
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [employee.department_id, preferredRole, employee.id]
+      );
+      if (rows.length) return rows[0];
+    }
+  }
+
+  const tlApprovers = await getTlApproversForEmployee(employee);
+  if (tlApprovers.length) {
+    return tlApprovers[0];
+  }
+
+  const [opsRows] = await db.query(
+    `SELECT id, full_name, role
+     FROM employees
+     WHERE is_active = 1
+       AND role = 'ops_head'
+       AND id <> ?
+     ORDER BY created_at ASC
+     LIMIT 1`,
+    [employee.id]
+  );
+
+  return opsRows[0] || null;
 }
 
 // GET /api/leaves
@@ -199,13 +248,26 @@ async function submit(req, res) {
     const approvers = await getLeaveApprovers(req.employee);
     const leaveWindow = formatLeaveWindow(from_date, to_date);
 
-    await notifyMany(db, approvers.uniqueRecipients.map(approver => approver.id), {
-      title: `Leave request from ${req.employee.full_name}`,
-      body: `${leave_type} leave requested for ${leaveWindow}${reason ? ` - ${reason}` : ''}`,
-      type: 'warning',
-      entity_type: 'leave_request',
-      entity_id: id,
-    });
+    if (approvers.managerApprover) {
+      await createNotification(db, {
+        recipient_id: approvers.managerApprover.id,
+        title: `Leave approval needed from ${req.employee.full_name}`,
+        body: `${leave_type} leave requested for ${leaveWindow}${reason ? ` - ${reason}` : ''}`,
+        type: 'warning',
+        entity_type: 'leave_request',
+        entity_id: id,
+      });
+    }
+
+    if (approvers.watcherRecipients.length) {
+      await notifyMany(db, approvers.watcherRecipients.map(approver => approver.id), {
+        title: `Leave request submitted by ${req.employee.full_name}`,
+        body: `${leave_type} leave requested for ${leaveWindow}${reason ? ` - ${reason}` : ''}`,
+        type: 'info',
+        entity_type: 'leave_request',
+        entity_id: id,
+      });
+    }
 
     return created(res, request);
   } catch (err) {
@@ -216,7 +278,7 @@ async function submit(req, res) {
 // GET /api/leaves/pending-tl
 async function pendingForTL(req, res) {
   try {
-    if (!TL_ROLES.includes(req.employee.role)) {
+    if (![...TL_ROLES, ...MGR_ROLES].includes(req.employee.role)) {
       return res.status(403).json({ success: false, error: 'Insufficient permissions' });
     }
 
@@ -239,7 +301,7 @@ async function pendingForTL(req, res) {
 
     const approvableRows = [];
     for (const row of rows) {
-      const approvers = await getTlApproversForEmployee({
+      const approver = await getPrimaryManagerForEmployee({
         id: row.employee_id,
         role: row.employee_role,
         team_id: row.team_id,
@@ -247,7 +309,7 @@ async function pendingForTL(req, res) {
         dept_slug: row.dept_slug,
       });
 
-      if (approvers.some(approver => approver.id === req.employee.id)) {
+      if (approver?.id === req.employee.id) {
         approvableRows.push(row);
       }
     }
@@ -261,19 +323,7 @@ async function pendingForTL(req, res) {
 // GET /api/leaves/pending-manager
 async function pendingForManager(req, res) {
   try {
-    const [rows] = await db.query(
-      `SELECT lr.*,
-              e.full_name AS employee_name,
-              e.employee_code,
-              tl.full_name AS tl_approved_by_name
-       FROM leave_requests lr
-       LEFT JOIN employees e ON lr.employee_id = e.id
-       LEFT JOIN employees tl ON lr.approved_by_tl = tl.id
-       WHERE lr.status IN ('pending', 'tl_approved')
-       ORDER BY FIELD(lr.status, 'pending', 'tl_approved'), lr.created_at ASC`
-    );
-
-    return ok(res, rows);
+    return ok(res, []);
   } catch (err) {
     return serverError(res, err);
   }
@@ -288,7 +338,7 @@ async function approveByTL(req, res) {
       return badRequest(res, `Cannot approve: request is already ${request.status}`);
     }
 
-    const approvers = await getTlApproversForEmployee({
+    const approver = await getPrimaryManagerForEmployee({
       id: request.employee_id,
       role: request.employee_role,
       team_id: request.team_id,
@@ -296,41 +346,48 @@ async function approveByTL(req, res) {
       dept_slug: request.dept_slug,
     });
 
-    if (!approvers.some(approver => approver.id === req.employee.id)) {
-      return badRequest(res, 'You are not the mapped TL/manager for this leave request');
+    if (!approver || approver.id !== req.employee.id) {
+      return badRequest(res, 'You are not the mapped manager for this leave request');
     }
 
+    const approvalColumn = req.employee.role === 'ops_head'
+      ? 'approved_by_manager = ?, manager_approved_at = NOW()'
+      : 'approved_by_tl = ?, tl_approved_at = NOW()';
     await db.query(
       `UPDATE leave_requests
-       SET status = 'tl_approved',
-           approved_by_tl = ?,
-           tl_approved_at = NOW()
+       SET status = 'approved',
+           ${approvalColumn}
        WHERE id = ?`,
       [req.employee.id, req.params.id]
     );
 
-    const managers = await getManagementApprovers(request.employee_id);
+    const watchers = await getWatcherRecipients([request.employee_id, req.employee.id]);
     const leaveWindow = formatLeaveWindow(request.from_date, request.to_date);
 
     await Promise.all([
       createNotification(db, {
         recipient_id: request.employee_id,
-        title: 'Leave approved by TL',
+        title: 'Leave approved',
         body: `${req.employee.full_name} approved your ${request.leave_type} leave for ${leaveWindow}`,
         type: 'success',
         entity_type: 'leave_request',
         entity_id: req.params.id,
       }),
-      notifyMany(db, managers.map(manager => manager.id), {
-        title: `TL approved leave for ${request.employee_name}`,
-        body: `${request.leave_type} leave for ${leaveWindow} is ready for final approval`,
+      notifyMany(db, watchers.map(watcher => watcher.id), {
+        title: `Leave approved for ${request.employee_name}`,
+        body: `${req.employee.full_name} approved ${request.leave_type} leave for ${leaveWindow}`,
         type: 'info',
         entity_type: 'leave_request',
         entity_id: req.params.id,
       }),
     ]);
 
-    return ok(res, { id: req.params.id, status: 'tl_approved' });
+    const [[requester]] = await db.query('SELECT email, full_name FROM employees WHERE id = ?', [request.employee_id]);
+    if (requester) {
+      await sendLeaveStatusEmail(requester.email, requester.full_name, request, 'approved');
+    }
+
+    return ok(res, { id: req.params.id, status: 'approved' });
   } catch (err) {
     return serverError(res, err);
   }
@@ -339,38 +396,7 @@ async function approveByTL(req, res) {
 // PATCH /api/leaves/:id/approve-manager
 async function approveByManager(req, res) {
   try {
-    const request = await getLeaveRequestById(req.params.id);
-    if (!request) return notFound(res, 'Leave request not found');
-    if (!['pending', 'tl_approved'].includes(request.status)) {
-      return badRequest(res, `Cannot approve: request is already ${request.status}`);
-    }
-
-    await db.query(
-      `UPDATE leave_requests
-       SET status = 'approved',
-           approved_by_manager = ?,
-           manager_approved_at = NOW()
-       WHERE id = ?`,
-      [req.employee.id, req.params.id]
-    );
-
-    const leaveWindow = formatLeaveWindow(request.from_date, request.to_date);
-    await createNotification(db, {
-      recipient_id: request.employee_id,
-      title: 'Leave approved',
-      body: `${req.employee.full_name} approved your ${request.leave_type} leave for ${leaveWindow}`,
-      type: 'success',
-      entity_type: 'leave_request',
-      entity_id: req.params.id,
-    });
-
-    // Send email notification
-    const [[requester]] = await db.query('SELECT email, full_name FROM employees WHERE id = ?', [request.employee_id]);
-    if (requester) {
-      await sendLeaveStatusEmail(requester.email, requester.full_name, request, 'approved');
-    }
-
-    return ok(res, { id: req.params.id, status: 'approved' });
+    return approveByTL(req, res);
   } catch (err) {
     return serverError(res, err);
   }
@@ -386,6 +412,17 @@ async function reject(req, res) {
       return badRequest(res, `Cannot reject: request is already ${request.status}`);
     }
 
+    const approver = await getPrimaryManagerForEmployee({
+      id: request.employee_id,
+      role: request.employee_role,
+      team_id: request.team_id,
+      department_id: request.department_id,
+      dept_slug: request.dept_slug,
+    });
+    if (!approver || approver.id !== req.employee.id) {
+      return badRequest(res, 'You are not the mapped manager for this leave request');
+    }
+
     await db.query(
       `UPDATE leave_requests
        SET status = 'rejected',
@@ -395,14 +432,24 @@ async function reject(req, res) {
     );
 
     const leaveWindow = formatLeaveWindow(request.from_date, request.to_date);
-    await createNotification(db, {
-      recipient_id: request.employee_id,
-      title: 'Leave rejected',
-      body: `${req.employee.full_name} rejected your ${request.leave_type} leave for ${leaveWindow}${reason ? ` - ${reason}` : ''}`,
-      type: 'error',
-      entity_type: 'leave_request',
-      entity_id: req.params.id,
-    });
+    const watchers = await getWatcherRecipients([request.employee_id, req.employee.id]);
+    await Promise.all([
+      createNotification(db, {
+        recipient_id: request.employee_id,
+        title: 'Leave rejected',
+        body: `${req.employee.full_name} rejected your ${request.leave_type} leave for ${leaveWindow}${reason ? ` - ${reason}` : ''}`,
+        type: 'error',
+        entity_type: 'leave_request',
+        entity_id: req.params.id,
+      }),
+      notifyMany(db, watchers.map(watcher => watcher.id), {
+        title: `Leave rejected for ${request.employee_name}`,
+        body: `${req.employee.full_name} rejected ${request.leave_type} leave for ${leaveWindow}${reason ? ` - ${reason}` : ''}`,
+        type: 'info',
+        entity_type: 'leave_request',
+        entity_id: req.params.id,
+      }),
+    ]);
 
     // Send email notification
     const [[requester]] = await db.query('SELECT email, full_name FROM employees WHERE id = ?', [request.employee_id]);

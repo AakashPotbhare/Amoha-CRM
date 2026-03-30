@@ -9,6 +9,25 @@ const VALID_TYPES = [
 ];
 const VALID_STATUS = ['pending','in_progress','completed','cancelled'];
 const VALID_CALL_STATUS = ['not_started','scheduled','link_sent','done','no_show','rescheduled','completed'];
+const DEPARTMENT_LEAD_ROLES = ['resume_head', 'marketing_tl', 'technical_head', 'sales_head', 'assistant_tl'];
+
+async function findDepartmentLead(departmentId) {
+  if (!departmentId) return null;
+
+  const placeholders = DEPARTMENT_LEAD_ROLES.map(() => '?').join(', ');
+  const [rows] = await db.query(
+    `SELECT e.id
+     FROM employees e
+     WHERE e.department_id = ?
+       AND e.is_active = 1
+       AND e.role IN (${placeholders})
+     ORDER BY FIELD(e.role, ${placeholders}), e.created_at ASC
+     LIMIT 1`,
+    [departmentId, ...DEPARTMENT_LEAD_ROLES, ...DEPARTMENT_LEAD_ROLES]
+  );
+
+  return rows[0] || null;
+}
 
 // GET /api/support-tasks
 async function list(req, res) {
@@ -47,12 +66,23 @@ async function list(req, res) {
     const [rows] = await db.query(
       `SELECT st.*,
               COALESCE(ce.full_name, st.candidate_name) AS candidate_name,
+              ce.email          AS candidate_email,
+              ce.phone          AS candidate_phone,
+              ce.current_domain AS candidate_technology,
+              DATE_FORMAT(st.scheduled_at, '%Y-%m-%d') AS scheduled_date,
+              DATE_FORMAT(st.scheduled_at, '%H:%i:%s') AS start_time,
+              DATE_FORMAT(st.due_date, '%Y-%m-%d')     AS deadline_date,
               e.full_name   AS assigned_to_name,
-              d.name        AS department_name
+              d.name        AS department_name,
+              creator.full_name      AS created_by_name,
+              creator.employee_code  AS created_by_code,
+              creator_dept.name      AS created_by_department
        FROM support_tasks st
        LEFT JOIN candidate_enrollments ce ON st.candidate_enrollment_id = ce.id
        LEFT JOIN employees e              ON st.assigned_to_employee_id = e.id
        LEFT JOIN departments d            ON st.department_id = d.id
+       LEFT JOIN employees creator        ON st.created_by_employee_id = creator.id
+       LEFT JOIN departments creator_dept ON creator.department_id = creator_dept.id
        ${where}
        ORDER BY st.created_at DESC
        LIMIT ? OFFSET ?`,
@@ -71,12 +101,23 @@ async function getOne(req, res) {
     const [[task]] = await db.query(
       `SELECT st.*,
               COALESCE(ce.full_name, st.candidate_name) AS candidate_name,
+              ce.email          AS candidate_email,
+              ce.phone          AS candidate_phone,
+              ce.current_domain AS candidate_technology,
+              DATE_FORMAT(st.scheduled_at, '%Y-%m-%d') AS scheduled_date,
+              DATE_FORMAT(st.scheduled_at, '%H:%i:%s') AS start_time,
+              DATE_FORMAT(st.due_date, '%Y-%m-%d')     AS deadline_date,
               e.full_name  AS assigned_to_name,
-              d.name       AS department_name
+              d.name       AS department_name,
+              creator.full_name      AS created_by_name,
+              creator.employee_code  AS created_by_code,
+              creator_dept.name      AS created_by_department
        FROM support_tasks st
        LEFT JOIN candidate_enrollments ce ON st.candidate_enrollment_id = ce.id
        LEFT JOIN employees e              ON st.assigned_to_employee_id = e.id
        LEFT JOIN departments d            ON st.department_id = d.id
+       LEFT JOIN employees creator        ON st.created_by_employee_id = creator.id
+       LEFT JOIN departments creator_dept ON creator.department_id = creator_dept.id
        WHERE st.id = ?`,
       [req.params.id]
     );
@@ -86,7 +127,7 @@ async function getOne(req, res) {
       `SELECT tc.*, e.full_name AS author_name
        FROM task_comments tc
        LEFT JOIN employees e ON tc.employee_id = e.id
-       WHERE tc.task_id = ?
+       WHERE tc.support_task_id = ?
        ORDER BY tc.created_at ASC`,
       [req.params.id]
     );
@@ -109,6 +150,7 @@ async function create(req, res) {
       due_date, deadline_date,
       company_name, interview_round, priority,
       candidate_name: candidateNameBody,
+      notes,
     } = req.body;
 
     if (!task_type) return badRequest(res, 'task_type is required');
@@ -130,26 +172,32 @@ async function create(req, res) {
       if (ce) resolvedName = ce.full_name;
     }
 
+    let resolvedAssigneeId = assigned_to_employee_id || null;
+    if (!resolvedAssigneeId && deptId) {
+      const lead = await findDepartmentLead(deptId);
+      resolvedAssigneeId = lead?.id || null;
+    }
+
     const id = uuidv4();
     await db.query(
       `INSERT INTO support_tasks
          (id, candidate_enrollment_id, candidate_name, task_type, department_id, team_id,
           assigned_to_employee_id, created_by_employee_id,
-          scheduled_at, due_date, company_name, interview_round, priority, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+          scheduled_at, due_date, company_name, interview_round, priority, notes, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
       [id, candidate_id || null, resolvedName, task_type, deptId, teamId,
-       assigned_to_employee_id || null, req.employee.id,
+       resolvedAssigneeId, req.employee.id,
        schedAt, dueAt, company_name || null, interview_round || null,
-       priority || 'medium']
+       priority || 'medium', notes || null]
     );
 
     const [[task]] = await db.query('SELECT * FROM support_tasks WHERE id = ?', [id]);
 
     // In-app notification — non-blocking
-    if (assigned_to_employee_id) {
+    if (resolvedAssigneeId) {
       const typeLabel = task_type.replace(/_/g, ' ');
       createNotification(db, {
-        recipient_id: assigned_to_employee_id,
+        recipient_id: resolvedAssigneeId,
         title: `New support task: ${typeLabel}`,
         body: resolvedName ? `Candidate: ${resolvedName}` : null,
         type: 'info',

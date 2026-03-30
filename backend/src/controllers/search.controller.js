@@ -25,14 +25,11 @@ async function search(req, res) {
 
     if (type === 'all' || type === 'candidates') {
       const [rows] = await db.query(
-        `SELECT id, full_name, email, phone, current_domain, visa_status,
-                pipeline_stage, marketing_status
+        `SELECT id, full_name, email, phone, current_domain, visa_status, pipeline_stage
          FROM candidate_enrollments
-         WHERE (full_name LIKE ? OR email LIKE ? OR phone LIKE ?
-                OR current_domain LIKE ? OR marketing_name LIKE ?)
-           AND is_active = 1
+         WHERE (full_name LIKE ? OR email LIKE ? OR phone LIKE ? OR current_domain LIKE ?)
          LIMIT ?`,
-        [like, like, like, like, like, limit],
+        [like, like, like, like, limit],
       );
       candidates.push(...rows);
     }

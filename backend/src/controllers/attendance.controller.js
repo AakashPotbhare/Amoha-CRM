@@ -6,7 +6,17 @@ const { createNotification } = require('../services/notification.service');
 // POST /api/attendance/check-in
 async function checkIn(req, res) {
   try {
-    const { latitude, longitude, notes, is_wfh } = req.body;
+    const {
+      latitude,
+      longitude,
+      check_in_lat,
+      check_in_lng,
+      check_in_location_id,
+      is_wfh,
+      is_late,
+      attendance_status,
+      shift_setting_id,
+    } = req.body;
     const empId = req.employee.id;
 
     // Check if already checked in today without checkout
@@ -18,11 +28,29 @@ async function checkIn(req, res) {
     );
     if (open) return badRequest(res, 'Already checked in. Please check out first.');
 
+    const resolvedLat = latitude ?? check_in_lat ?? null;
+    const resolvedLng = longitude ?? check_in_lng ?? null;
+
     const id = uuidv4();
     await db.query(
-      `INSERT INTO attendance_records (id, employee_id, date, check_in_time, check_in_lat, check_in_lng, is_wfh)
-       VALUES (?, ?, ?, NOW(), ?, ?, ?)`,
-      [id, empId, today, latitude || null, longitude || null, is_wfh ? 1 : 0]
+      `INSERT INTO attendance_records (
+         id, employee_id, date, check_in_time,
+         check_in_lat, check_in_lng, check_in_location_id,
+         is_wfh, is_late, attendance_status, shift_setting_id
+       )
+       VALUES (?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        empId,
+        today,
+        resolvedLat,
+        resolvedLng,
+        check_in_location_id || null,
+        is_wfh ? 1 : 0,
+        is_late ? 1 : 0,
+        attendance_status || (is_wfh ? 'wfh' : 'present'),
+        shift_setting_id || null,
+      ]
     );
 
     const [[record]] = await db.query('SELECT * FROM attendance_records WHERE id = ?', [id]);

@@ -150,6 +150,8 @@ CREATE TABLE IF NOT EXISTS support_tasks (
   scheduled_at              DATETIME     NULL,
   due_date                  DATE         NULL,
 
+  notes                     TEXT         NULL,
+
   assigned_to_employee_id   CHAR(36)     NULL,
   department_id             CHAR(36)     NULL,
   team_id                   CHAR(36)     NULL,
@@ -192,6 +194,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   assigned_to_employee_id     CHAR(36)     NULL,
   assigned_to_team_id         CHAR(36)     NULL,
   assigned_to_department_id   CHAR(36)     NULL,
+  is_edited                   BOOLEAN      NOT NULL DEFAULT FALSE,
+  edited_at                   DATETIME     NULL,
   created_by_employee_id      CHAR(36)     NOT NULL,
   created_at                  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at                  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -199,6 +203,26 @@ CREATE TABLE IF NOT EXISTS tasks (
   FOREIGN KEY (assigned_to_team_id)       REFERENCES teams(id) ON DELETE SET NULL,
   FOREIGN KEY (assigned_to_department_id) REFERENCES departments(id) ON DELETE SET NULL,
   FOREIGN KEY (created_by_employee_id)    REFERENCES employees(id)
+);
+
+CREATE TABLE IF NOT EXISTS task_change_requests (
+  id                        CHAR(36)     NOT NULL DEFAULT (UUID()) PRIMARY KEY,
+  task_id                   CHAR(36)     NOT NULL,
+  requested_by_employee_id  CHAR(36)     NOT NULL,
+  approver_employee_id      CHAR(36)     NOT NULL,
+  action                    ENUM('update','delete') NOT NULL,
+  requested_changes         JSON         NULL,
+  reason                    TEXT         NULL,
+  status                    ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  review_note               TEXT         NULL,
+  reviewed_by_employee_id   CHAR(36)     NULL,
+  created_at                TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at               DATETIME     NULL,
+  applied_at                DATETIME     NULL,
+  FOREIGN KEY (task_id)                  REFERENCES tasks(id) ON DELETE CASCADE,
+  FOREIGN KEY (requested_by_employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+  FOREIGN KEY (approver_employee_id)     REFERENCES employees(id) ON DELETE CASCADE,
+  FOREIGN KEY (reviewed_by_employee_id)  REFERENCES employees(id) ON DELETE SET NULL
 );
 
 -- ─── Task Comments ────────────────────────────────────────────────────────────
