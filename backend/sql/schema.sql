@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS departments (
 );
 
 INSERT IGNORE INTO departments (id, name, slug) VALUES
+  (UUID(), 'Management', 'management'),
+  (UUID(), 'Operations', 'operations'),
   (UUID(), 'Sales',      'sales'),
   (UUID(), 'Resume',     'resume'),
   (UUID(), 'Marketing',  'marketing'),

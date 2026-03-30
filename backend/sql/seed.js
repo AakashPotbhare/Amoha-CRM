@@ -31,8 +31,16 @@ async function main() {
   for (const row of deptRows) deptIds[row.slug] = row.id;
 
   // Ensure all required departments exist
-  const required = ['sales','resume','marketing','technical','compliance'];
-  const names    = { sales:'Sales', resume:'Resume', marketing:'Marketing', technical:'Technical', compliance:'Compliance' };
+  const required = ['management','operations','sales','resume','marketing','technical','compliance'];
+  const names    = {
+    management:'Management',
+    operations:'Operations',
+    sales:'Sales',
+    resume:'Resume',
+    marketing:'Marketing',
+    technical:'Technical',
+    compliance:'Compliance',
+  };
   for (const slug of required) {
     if (!deptIds[slug]) {
       const [r] = await db.query('INSERT INTO departments (id,name,slug) VALUES (UUID(),?,?)', [names[slug], slug]);
@@ -44,7 +52,8 @@ async function main() {
 
   // ── Teams ──────────────────────────────────────────────────────────
   const teamDefs = [
-    { key: 'mgmt',  name: 'Management',           dept: 'sales'      },
+    { key: 'mgmt',  name: 'Management',           dept: 'management' },
+    { key: 'ops1',  name: 'Operations',           dept: 'operations' },
     { key: 'sal1',  name: 'Sales Team',           dept: 'sales'      },
     { key: 'res1',  name: 'Resume Team',          dept: 'resume'     },
     { key: 'mkt1',  name: 'Marketing Team 1',     dept: 'marketing'  },
@@ -82,40 +91,44 @@ async function main() {
   // ── Employees ──────────────────────────────────────────────────────
   const employees = [
     // ── Directors (3) ──
-    { employee_code:'DIR001', full_name:'Ashish Dabhi',        email:'ashish.dabhi@amoha.com',      designation:'Director',            dept:'sales',      team:'mgmt', role:'director'            },
-    { employee_code:'DIR002', full_name:'Karan Sharma',         email:'karan.sharma@amoha.com',      designation:'Director',            dept:'sales',      team:'mgmt', role:'director'            },
-    { employee_code:'DIR003', full_name:'Manthan Patel',        email:'manthan.patel@amoha.com',     designation:'Director',            dept:'sales',      team:'mgmt', role:'director'            },
+    { full_name:'Ashish Dabhi',        email:'ashish.dabhi@amoha.com',      designation:'Director',            dept:'management', team:'mgmt', role:'director'            },
+    { full_name:'Karan Sharma',         email:'karan.sharma@amoha.com',      designation:'Director',            dept:'management', team:'mgmt', role:'director'            },
+    { full_name:'Manthan Patel',        email:'manthan.patel@amoha.com',     designation:'Director',            dept:'management', team:'mgmt', role:'director'            },
 
     // ── Operations & HR Heads (same level, report to Directors) ──
-    { employee_code:'OPS001', full_name:'Tripesh Koneru',       email:'tripesh.koneru@amoha.com',    designation:'Operations Head',     dept:'sales',      team:'mgmt', role:'ops_head'            },
-    { employee_code:'HR001',  full_name:'BalKishan Tiwari',     email:'balkishan.tiwari@amoha.com',  designation:'HR Head',             dept:'compliance', team:'com1', role:'hr_head'             },
+    { full_name:'Tripesh Koneru',       email:'tripesh.koneru@amoha.com',    designation:'Operations Head',     dept:'operations', team:'ops1', role:'ops_head'            },
+    { full_name:'BalKishan Tiwari',     email:'balkishan.tiwari@amoha.com',  designation:'HR Head',             dept:'compliance', team:'com1', role:'hr_head'             },
 
     // ── Sales (under Operations Head) ──
-    { employee_code:'SAL001', full_name:'Vishesh Shah',         email:'vishesh.shah@amoha.com',      designation:'Sales Head',          dept:'sales',      team:'sal1', role:'sales_head'          },
-    { employee_code:'SAL002', full_name:'Parth Thakkar',        email:'parth.thakkar@amoha.com',     designation:'Assistant Team Lead', dept:'sales',      team:'sal1', role:'assistant_tl'        },
-    { employee_code:'SAL003', full_name:'Khushboo Chaudhary',   email:'khushboo.chaudhary@amoha.com',designation:'Sales Executive',     dept:'sales',      team:'sal1', role:'sales_executive'     },
+    { full_name:'Vishesh Shah',         email:'vishesh.shah@amoha.com',      designation:'Sales Head',          dept:'sales',      team:'sal1', role:'sales_head'          },
+    { full_name:'Parth Thakkar',        email:'parth.thakkar@amoha.com',     designation:'Assistant Team Lead', dept:'sales',      team:'sal1', role:'assistant_tl'        },
+    { full_name:'Khushboo Chaudhary',   email:'khushboo.chaudhary@amoha.com',designation:'Sales Executive',     dept:'sales',      team:'sal1', role:'sales_executive'     },
 
     // ── Technical (under Operations Head) ──
-    { employee_code:'TEC001', full_name:'Aakash Potbhare',      email:'aakash.potbhare@amoha.com',   designation:'Technical Head',      dept:'technical',  team:'tec1', role:'technical_head'      },
-    { employee_code:'TEC002', full_name:'Prateek Makwana',      email:'prateek.makwana@amoha.com',   designation:'Technical Executive', dept:'technical',  team:'tec1', role:'technical_executive' },
-    { employee_code:'TEC003', full_name:'Archie Geda',          email:'archie.geda@amoha.com',       designation:'Technical Executive', dept:'technical',  team:'tec1', role:'technical_executive' },
-    { employee_code:'TEC004', full_name:'Deep Patel',           email:'deep.patel@amoha.com',        designation:'Technical Executive', dept:'technical',  team:'tec1', role:'technical_executive' },
-    { employee_code:'TEC005', full_name:'Aarti Vishwakarma',    email:'aarti.vishwakarma@amoha.com', designation:'Technical Executive', dept:'technical',  team:'tec2', role:'technical_executive' },
-    { employee_code:'TEC006', full_name:'Anusha Pandey',        email:'anusha.pandey@amoha.com',     designation:'Technical Executive', dept:'technical',  team:'tec2', role:'technical_executive' },
-    { employee_code:'TEC007', full_name:'Shital Yadav',         email:'shital.yadav@amoha.com',      designation:'Technical Executive', dept:'technical',  team:'tec2', role:'technical_executive' },
+    { full_name:'Aakash Potbhare',      email:'aakash.potbhare@amoha.com',   designation:'Technical Head',      dept:'technical',  team:'tec1', role:'technical_head'      },
+    { full_name:'Prateek Makwana',      email:'prateek.makwana@amoha.com',   designation:'Technical Executive', dept:'technical',  team:'tec1', role:'technical_executive' },
+    { full_name:'Archie Geda',          email:'archie.geda@amoha.com',       designation:'Technical Executive', dept:'technical',  team:'tec1', role:'technical_executive' },
+    { full_name:'Deep Patel',           email:'deep.patel@amoha.com',        designation:'Technical Executive', dept:'technical',  team:'tec1', role:'technical_executive' },
+    { full_name:'Aarti Vishwakarma',    email:'aarti.vishwakarma@amoha.com', designation:'Technical Executive', dept:'technical',  team:'tec2', role:'technical_executive' },
+    { full_name:'Anusha Pandey',        email:'anusha.pandey@amoha.com',     designation:'Technical Executive', dept:'technical',  team:'tec2', role:'technical_executive' },
+    { full_name:'Shital Yadav',         email:'shital.yadav@amoha.com',      designation:'Technical Executive', dept:'technical',  team:'tec2', role:'technical_executive' },
 
     // ── Resume (under Operations Head) ──
-    { employee_code:'RES001', full_name:'Yogesh Jadoun',        email:'yogesh.jadoun@amoha.com',     designation:'Resume Head',         dept:'resume',     team:'res1', role:'resume_head'         },
+    { full_name:'Yogesh Jadoun',        email:'yogesh.jadoun@amoha.com',     designation:'Resume Head',         dept:'resume',     team:'res1', role:'resume_head'         },
 
     // ── Compliance (under Operations Head) ──
-    { employee_code:'COM001', full_name:'Gaurav Garg',          email:'gaurav.garg@amoha.com',       designation:'Compliance Officer',  dept:'compliance', team:'com1', role:'compliance_officer'  },
+    { full_name:'Gaurav Garg',          email:'gaurav.garg@amoha.com',       designation:'Compliance Officer',  dept:'compliance', team:'com1', role:'compliance_officer'  },
 
     // ── Marketing (4 Teams, under Operations Head) ──
-    { employee_code:'MKT001', full_name:'Aditya Singh',         email:'aditya.singh@amoha.com',      designation:'Marketing Team Lead', dept:'marketing',  team:'mkt1', role:'marketing_tl'        },
-    { employee_code:'MKT002', full_name:'Bhavith Nethani',      email:'bhavith.nethani@amoha.com',   designation:'Marketing Team Lead', dept:'marketing',  team:'mkt2', role:'marketing_tl'        },
-    { employee_code:'MKT003', full_name:'Yesh Shah',            email:'yesh.shah@amoha.com',         designation:'Marketing Team Lead', dept:'marketing',  team:'mkt3', role:'marketing_tl'        },
-    { employee_code:'MKT004', full_name:'Aman Pandey',          email:'aman.pandey@amoha.com',       designation:'Marketing Team Lead', dept:'marketing',  team:'mkt4', role:'marketing_tl'        },
+    { full_name:'Aditya Singh',         email:'aditya.singh@amoha.com',      designation:'Marketing Team Lead', dept:'marketing',  team:'mkt1', role:'marketing_tl'        },
+    { full_name:'Bhavith Nethani',      email:'bhavith.nethani@amoha.com',   designation:'Marketing Team Lead', dept:'marketing',  team:'mkt2', role:'marketing_tl'        },
+    { full_name:'Yesh Shah',            email:'yesh.shah@amoha.com',         designation:'Marketing Team Lead', dept:'marketing',  team:'mkt3', role:'marketing_tl'        },
+    { full_name:'Aman Pandey',          email:'aman.pandey@amoha.com',       designation:'Marketing Team Lead', dept:'marketing',  team:'mkt4', role:'marketing_tl'        },
   ];
+
+  employees.forEach((emp, index) => {
+    emp.employee_code = `ARS${String(index + 1).padStart(5, '0')}`;
+  });
 
   let created = 0;
   for (const emp of employees) {

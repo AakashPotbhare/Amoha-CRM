@@ -72,7 +72,7 @@ export default function ResumeDashboard() {
   const { toast } = useToast();
   const [tasks, setTasks] = useState<ResumeTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("active");
   const [expandedTask, setExpandedTask] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, TaskComment[]>>({});
   const [resumeLogs, setResumeLogs] = useState<Record<string, ResumeVersion[]>>({});
@@ -237,8 +237,26 @@ export default function ResumeDashboard() {
     }
   };
 
+  const downloadResume = async (url: string, filename: string) => {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("File not found");
+      const blob = await resp.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch {
+      toast({ title: "Download failed", description: "Could not retrieve the file.", variant: "destructive" });
+    }
+  };
+
   const filtered = useMemo(() => {
     if (statusFilter === "all") return tasks;
+    if (statusFilter === "active") return tasks.filter((task) => !["completed", "cancelled"].includes(task.status));
     return tasks.filter((task) => task.status === statusFilter);
   }, [tasks, statusFilter]);
 
@@ -275,6 +293,7 @@ export default function ResumeDashboard() {
 
           <div className="flex items-center gap-3">
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={selectClass}>
+              <option value="active">Active Tasks ({queuedCount + inProgressCount})</option>
               <option value="all">All Statuses ({tasks.length})</option>
               <option value="pending">Queued ({queuedCount})</option>
               <option value="in_progress">In Progress ({inProgressCount})</option>
@@ -386,7 +405,7 @@ export default function ResumeDashboard() {
                                 <div key={resume.id} className="rounded-lg border border-border p-3">
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
-                                      <button onClick={() => window.open(resume.file_url, "_blank")} className="truncate text-left text-sm font-medium text-primary hover:underline">
+                                      <button onClick={() => downloadResume(resume.file_url, resume.file_name)} className="truncate text-left text-sm font-medium text-primary hover:underline">
                                         {resume.file_name}
                                       </button>
                                       <p className="mt-1 text-xs text-muted-foreground">

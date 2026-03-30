@@ -19,17 +19,17 @@ async function seed() {
   });
 
   // Get department + team IDs (created by schema.sql)
-  const [[salesDept]] = await conn.query(
-    `SELECT id FROM departments WHERE slug = 'sales' LIMIT 1`
+  const [[managementDept]] = await conn.query(
+    `SELECT id FROM departments WHERE slug = 'management' LIMIT 1`
   );
-  if (!salesDept) {
+  if (!managementDept) {
     console.error('❌ Departments not found. Run setupDb.js first.');
     process.exit(1);
   }
 
-  // Create a default team for Sales if none exists
+  // Create a default team for Management if none exists
   const [[existingTeam]] = await conn.query(
-    `SELECT id FROM teams WHERE department_id = ? LIMIT 1`, [salesDept.id]
+    `SELECT id FROM teams WHERE department_id = ? LIMIT 1`, [managementDept.id]
   );
 
   let teamId;
@@ -39,25 +39,35 @@ async function seed() {
     teamId = uuidv4();
     await conn.query(
       `INSERT INTO teams (id, name, department_id) VALUES (?, 'Management', ?)`,
-      [teamId, salesDept.id]
+      [teamId, managementDept.id]
     );
+  }
+
+  async function getNextEmployeeCode() {
+    const [[row]] = await conn.query(
+      `SELECT MAX(CAST(SUBSTRING(employee_code, 4) AS UNSIGNED)) AS max_seq
+       FROM employees
+       WHERE employee_code REGEXP '^ARS[0-9]{5}$'`
+    );
+    return `ARS${String(Number(row?.max_seq || 0) + 1).padStart(5, '0')}`;
   }
 
   const password = 'Admin@1234';
   const hash     = await bcrypt.hash(password, 12);
   const empId    = uuidv4();
+  const employeeCode = await getNextEmployeeCode();
 
   await conn.query(`
     INSERT INTO employees
       (id, employee_code, full_name, email, password_hash, role, department_id, team_id, joining_date)
     VALUES
-      (?, 'DIR001', 'Admin Director', 'director@amoha.com', ?, 'director', ?, ?, CURDATE())
+      (?, ?, 'Admin Director', 'director@amoha.com', ?, 'director', ?, ?, CURDATE())
     ON DUPLICATE KEY UPDATE full_name = full_name
-  `, [empId, hash, salesDept.id, teamId]);
+  `, [empId, employeeCode, hash, managementDept.id, teamId]);
 
   console.log('✅ Director account created!');
   console.log('');
-  console.log('  Employee Code : DIR001');
+  console.log(`  Employee Code : ${employeeCode}`);
   console.log('  Password      : Admin@1234');
   console.log('');
   console.log('Change this password after first login via HR Management.');

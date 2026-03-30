@@ -29,6 +29,21 @@ const ROLE_LABELS = {
   resume_builder:      'Resume Builder',
 };
 
+async function getNextEmployeeCode() {
+  const [[row]] = await db.query(
+    `SELECT MAX(CAST(SUBSTRING(employee_code, 4) AS UNSIGNED)) AS max_seq
+     FROM employees
+     WHERE employee_code REGEXP '^ARS[0-9]{5}$'`
+  );
+
+  const nextSeq = Number(row?.max_seq || 0) + 1;
+  if (nextSeq > 99999) {
+    throw new Error('Employee code limit reached for ARS99999');
+  }
+
+  return `ARS${String(nextSeq).padStart(5, '0')}`;
+}
+
 // GET /api/employees
 async function list(req, res) {
   try {
@@ -118,15 +133,11 @@ async function create(req, res) {
     }
 
     // Auto-generate employee code if not provided
-    let employee_code = providedCode;
+    let employee_code = providedCode ? providedCode.toUpperCase() : '';
     if (!employee_code) {
-      const year = new Date().getFullYear();
-      const [[{ cnt }]] = await db.query(
-        `SELECT COUNT(*) AS cnt FROM employees WHERE employee_code LIKE ?`,
-        [`ARS${year}%`]
-      );
-      const seq = String(Number(cnt) + 1).padStart(4, '0');
-      employee_code = `ARS${year}${seq}`;
+      employee_code = await getNextEmployeeCode();
+    } else if (!/^ARS\d{5}$/.test(employee_code)) {
+      return badRequest(res, 'employee_code must follow the ARS00001 format');
     }
 
     // Default team_id if not provided — use first team in the department

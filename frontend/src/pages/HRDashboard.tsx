@@ -137,6 +137,10 @@ const MONTH_NAMES = [
 ];
 
 const TL_ROLES = ["director","ops_head","hr_head","sales_head","technical_head","marketing_tl","resume_head","compliance_officer","assistant_tl"];
+const ROLE_DEFAULT_DEPARTMENT: Record<string, string> = {
+  director: "management",
+  ops_head: "operations",
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -282,6 +286,27 @@ export default function HRDashboard() {
     () => fDeptId ? teams.filter(t => t.department_id === fDeptId) : teams,
     [teams, fDeptId]
   );
+
+  useEffect(() => {
+    if (!dialogOpen) return;
+
+    const forcedDeptSlug = ROLE_DEFAULT_DEPARTMENT[fRole];
+    if (!forcedDeptSlug) return;
+
+    const forcedDept = departments.find(d => d.slug === forcedDeptSlug);
+    if (!forcedDept) return;
+
+    const forcedTeam = teams.find(t => t.department_id === forcedDept.id);
+    if (fDeptId !== forcedDept.id) {
+      setFDeptId(forcedDept.id);
+      setFTeamId(forcedTeam?.id || "");
+      return;
+    }
+
+    if (!fTeamId || !teams.some(t => t.id === fTeamId && t.department_id === forcedDept.id)) {
+      setFTeamId(forcedTeam?.id || "");
+    }
+  }, [dialogOpen, fRole, departments, teams, fDeptId, fTeamId]);
 
   const tls = useMemo(
     () => employees.filter(e => TL_ROLES.includes(e.role) && e.is_active),

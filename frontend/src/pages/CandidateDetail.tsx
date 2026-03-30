@@ -317,6 +317,23 @@ export default function CandidateDetail() {
   const [newResumeNotes, setNewResumeNotes] = useState("");
   const [newResumeSaving, setNewResumeSaving] = useState(false);
 
+  const handleDownloadResume = async (url: string, filename: string) => {
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("File not found");
+      const blob = await resp.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch {
+      toast({ title: "Download failed", description: "Could not retrieve the file.", variant: "destructive" });
+    }
+  };
+
   const fetchResumes = async () => {
     if (!id) return;
     setResumesLoading(true);
@@ -1135,11 +1152,12 @@ export default function CandidateDetail() {
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <a href={rv.file_url} target="_blank" rel="noopener noreferrer">
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                              <Download className="h-3.5 w-3.5 mr-1" /> Download
-                            </Button>
-                          </a>
+                          <Button
+                            size="sm" variant="ghost" className="h-7 px-2 text-xs"
+                            onClick={() => handleDownloadResume(rv.file_url, rv.file_name)}
+                          >
+                            <Download className="h-3.5 w-3.5 mr-1" /> Download
+                          </Button>
                           {canManageResumes && (
                             <>
                               <Button

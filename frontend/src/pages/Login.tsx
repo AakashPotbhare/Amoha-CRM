@@ -83,7 +83,7 @@ export default function Login() {
                       <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         id="code"
-                        placeholder="ARS202301"
+                        placeholder="ARS00001"
                         value={employeeCode}
                         onChange={(e) => setEmployeeCode(e.target.value.toUpperCase())}
                         className="pl-10 uppercase w-full"
@@ -155,7 +155,7 @@ export default function Login() {
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                         <Input
                           id="reset-val"
-                          placeholder="ARS20240001 or you@example.com"
+                          placeholder="ARS00001 or you@example.com"
                           value={resetValue}
                           onChange={(e) => setResetValue(e.target.value)}
                           className="pl-10 w-full"
