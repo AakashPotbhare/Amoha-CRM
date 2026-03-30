@@ -38,8 +38,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: 'Amoha Pathfinder/backend/package-lock.json'
-
+          cache-dependency-path: './Amoha Pathfinder/backend/package-lock.json'
       - name: Install dependencies
         run: npm ci
 
@@ -84,8 +83,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: 'Amoha Pathfinder/backend/package-lock.json'
-
+         cache-dependency-path: './Amoha Pathfinder/backend/package-lock.json'
       - name: Install dependencies
         run: npm ci
 
@@ -129,8 +127,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-          cache-dependency-path: 'Amoha Pathfinder/frontend/package-lock.json'
-
+      cache-dependency-path: 'Amoha Pathfinder/frontend/package-lock.json'
       - name: Install dependencies
         run: npm ci
 
