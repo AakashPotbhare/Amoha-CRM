@@ -112,7 +112,7 @@ export default function CreateTask() {
       });
 
       toast({ title: "Success", description: "Task has been created and assigned successfully!" });
-      navigate("/tasks/inbox");
+      navigate("/tasks/inbox?tab=created");
     } catch (err: any) {
       const msg = err.message || "Unexpected error occurred while creating task";
       setValidationError(msg);

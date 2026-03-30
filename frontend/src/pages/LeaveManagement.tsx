@@ -114,7 +114,7 @@ export default function LeaveManagement() {
   const [withdrawTarget, setWithdrawTarget] = useState<LeaveRequest | null>(null);
   const [withdrawLoading, setWithdrawLoading] = useState(false);
 
-  const APPROVER_ROLES = ["director", "ops_head", "hr_head", "sales_head", "technical_head", "marketing_tl", "resume_head", "assistant_tl"];
+  const APPROVER_ROLES = ["ops_head", "sales_head", "technical_head", "marketing_tl", "resume_head", "assistant_tl"];
   const isApprover = employee && APPROVER_ROLES.includes(employee.role);
 
   const fetchData = useCallback(async () => {
@@ -134,10 +134,7 @@ export default function LeaveManagement() {
 
     // Pending approvals (for approvers)
     if (isApprover) {
-      const isManagerApprover = ["director", "ops_head", "hr_head"].includes(employee.role);
-      const pendingRes = await api.get<LeaveRequest[]>(
-        isManagerApprover ? "/api/leaves/pending-manager" : "/api/leaves/pending-tl"
-      );
+      const pendingRes = await api.get<LeaveRequest[]>("/api/leaves/pending-tl");
       if (pendingRes.success && pendingRes.data) {
         setPendingApprovals(pendingRes.data.map(normalizeLeaveRequest));
       }
@@ -379,7 +376,7 @@ export default function LeaveManagement() {
                     <span className="text-destructive ml-2">Exceeds available balance</span>
                   )}
                   {totalDays >= 3 && (
-                    <span className="text-muted-foreground ml-2">(Requires Ops Head approval)</span>
+                    <span className="text-muted-foreground ml-2">(Your mapped manager will approve; HR and Ops are notified)</span>
                   )}
                 </p>
               )}

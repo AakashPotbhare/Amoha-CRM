@@ -19,7 +19,7 @@ interface CandidateOption {
   email: string | null;
   phone: string | null;
   gender: string | null;
-  technology: string | null;
+  current_domain: string | null;
 }
 
 interface TeamOption {
@@ -94,6 +94,7 @@ export default function CreateSupportTask() {
   const [teams, setTeams] = useState<TeamOption[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [detectedRound, setDetectedRound] = useState<string | null>(null);
+  const isResumeTask = taskType === "resume_building" || taskType === "resume_rebuilding";
 
   // Fetch reference data
   useEffect(() => {
@@ -116,11 +117,11 @@ export default function CreateSupportTask() {
     [candidates, candidateId]
   );
 
-  // Auto-set department when task type changes (only resume_building auto-selects resume dept)
+  // Auto-route resume tasks to the resume department and default them to the resume head queue.
   useEffect(() => {
     let slug = "";
-    if (taskType === "resume_building") slug = "resume";
-    else if (taskType !== "resume_rebuilding") slug = "technical";
+    if (isResumeTask) slug = "resume";
+    else slug = "technical";
 
     if (slug) {
       const dept = departments.find((d) => d.slug === slug);
@@ -129,15 +130,19 @@ export default function CreateSupportTask() {
         const deptTeam = teams.find((t) => t.department_id === dept.id);
         if (deptTeam) setSelectedTeam(deptTeam.id);
         else setSelectedTeam("");
-        setSelectedEmployee("");
+        if (isResumeTask) {
+          const deptLead = employees.find((emp) => emp.department_id === dept.id && emp.role === "resume_head");
+          setSelectedEmployee(deptLead?.id || "");
+        } else {
+          setSelectedEmployee("");
+        }
       }
     } else {
-      // resume_rebuilding: don't auto-select any department
       setSelectedDept("");
       setSelectedTeam("");
       setSelectedEmployee("");
     }
-  }, [taskType, departments, teams]);
+  }, [isResumeTask, departments, teams, employees]);
 
   // Auto-detect round when candidate + company changes
   useEffect(() => {
@@ -172,7 +177,6 @@ export default function CreateSupportTask() {
     : employees;
 
   // Which fields to show based on task type
-  const isResumeTask = taskType === "resume_building" || taskType === "resume_rebuilding";
   const showJD = taskType === "interview_support";
   const showTime = taskType === "interview_support" || taskType === "assessment_support" || taskType === "preparation_call";
   const showScheduledDate = taskType !== "assessment_support";
@@ -287,7 +291,7 @@ export default function CreateSupportTask() {
             </div>
             <div>
               <span className="text-muted-foreground block text-xs">Technology</span>
-              <span className="text-foreground">{selectedCandidate.technology || "—"}</span>
+              <span className="text-foreground">{selectedCandidate.current_domain || "—"}</span>
             </div>
           </div>
         )}

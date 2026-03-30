@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft, Pencil, Save, X, Trash2, Loader2, ShieldCheck,
   User, GraduationCap, CreditCard, Megaphone, Clock, ExternalLink,
-  Phone, Mail, MapPin, Globe, Briefcase,
+  Phone, Mail, MapPin, Globe, Briefcase, Upload, FileText, Download,
 } from "lucide-react";
 import { api } from "@/lib/api.client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -150,6 +150,17 @@ type PlacementOrder = {
   bill_rate: string | null;
 };
 
+type ResumeVersion = {
+  id: string;
+  file_url: string;
+  file_name: string;
+  notes: string | null;
+  is_current: boolean;
+  uploaded_by_name: string | null;
+  uploaded_by_code: string | null;
+  created_at: string;
+};
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const STAGES = [
@@ -186,9 +197,10 @@ const MARKETING_STATUS_COLORS: Record<string, string> = {
   placed: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
 };
 
-const PROFILE_EDIT_ROLES = ["director", "hr_head", "sales_head", "assistant_tl", "sales_executive"];
+const PROFILE_EDIT_ROLES    = ["director", "hr_head", "sales_head", "assistant_tl", "sales_executive"];
 const CREDENTIAL_VIEW_ROLES = ["director", "hr_head", "marketing_tl", "recruiter", "senior_recruiter"];
-const DELETE_ROLES = ["director", "hr_head"];
+const DELETE_ROLES          = ["director", "hr_head"];
+const RESUME_MANAGE_ROLES   = ["director", "ops_head", "hr_head", "marketing_tl", "recruiter", "senior_recruiter", "resume_head", "resume_builder"];
 
 const VISA_WITH_EAD = ["F1 OPT", "STEM OPT"];
 
@@ -289,6 +301,101 @@ export default function CandidateDetail() {
   // Delete dialog
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Resume versions
+  const canManageResumes = RESUME_MANAGE_ROLES.includes(role);
+  const [resumes, setResumes] = useState<ResumeVersion[]>([]);
+  const [resumesLoading, setResumesLoading] = useState(false);
+  const [deletingResumeId, setDeletingResumeId] = useState<string | null>(null);
+  const [confirmDeleteResumeId, setConfirmDeleteResumeId] = useState<string | null>(null);
+  const [replaceResumeId, setReplaceResumeId] = useState<string | null>(null);
+  const [replaceFile, setReplaceFile] = useState<File | null>(null);
+  const [replaceNotes, setReplaceNotes] = useState("");
+  const [replaceSaving, setReplaceSaving] = useState(false);
+  const [uploadingNew, setUploadingNew] = useState(false);
+  const [newResumeFile, setNewResumeFile] = useState<File | null>(null);
+  const [newResumeNotes, setNewResumeNotes] = useState("");
+  const [newResumeSaving, setNewResumeSaving] = useState(false);
+
+  const fetchResumes = async () => {
+    if (!id) return;
+    setResumesLoading(true);
+    try {
+      const res = await api.get<ResumeVersion[]>(`/api/candidates/${id}/resumes`);
+      if (res.success) setResumes(res.data ?? []);
+    } catch {}
+    setResumesLoading(false);
+  };
+
+  const handleDeleteResume = async (resumeId: string) => {
+    setDeletingResumeId(resumeId);
+    try {
+      await api.delete(`/api/candidates/${id}/resumes/${resumeId}`);
+      toast({ title: "Resume deleted" });
+      setConfirmDeleteResumeId(null);
+      fetchResumes();
+      void load(); // refresh resume_update_count
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+    setDeletingResumeId(null);
+  };
+
+  const handleReplaceResume = async () => {
+    if (!replaceFile || !id) return;
+    setReplaceSaving(true);
+    try {
+      const token = localStorage.getItem("recruithub_token");
+      const BASE  = import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const form  = new FormData();
+      form.append("resume", replaceFile);
+      if (replaceNotes.trim()) form.append("notes", replaceNotes.trim());
+      const resp = await fetch(`${BASE}/api/candidates/${id}/resumes`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: form,
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.success) throw new Error(json.error || "Upload failed");
+      toast({ title: "Resume replaced", description: "New version is now the current resume." });
+      setReplaceResumeId(null);
+      setReplaceFile(null);
+      setReplaceNotes("");
+      fetchResumes();
+      void load();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+    setReplaceSaving(false);
+  };
+
+  const handleUploadNew = async () => {
+    if (!newResumeFile || !id) return;
+    setNewResumeSaving(true);
+    try {
+      const token = localStorage.getItem("recruithub_token");
+      const BASE  = import.meta.env.VITE_API_URL || "http://localhost:4000";
+      const frm   = new FormData();
+      frm.append("resume", newResumeFile);
+      if (newResumeNotes.trim()) frm.append("notes", newResumeNotes.trim());
+      const resp = await fetch(`${BASE}/api/candidates/${id}/resumes`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: frm,
+      });
+      const json = await resp.json();
+      if (!resp.ok || !json.success) throw new Error(json.error || "Upload failed");
+      toast({ title: "Resume uploaded" });
+      setUploadingNew(false);
+      setNewResumeFile(null);
+      setNewResumeNotes("");
+      fetchResumes();
+      void load();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+    setNewResumeSaving(false);
+  };
 
   async function load() {
     if (!id) return;
@@ -567,6 +674,9 @@ export default function CandidateDetail() {
               <Megaphone className="h-3.5 w-3.5" />Marketing Access
             </TabsTrigger>
           )}
+          <TabsTrigger value="resumes" className="flex items-center gap-1.5" onClick={fetchResumes}>
+            <FileText className="h-3.5 w-3.5" />Resumes
+          </TabsTrigger>
           <TabsTrigger value="timeline" className="flex items-center gap-1.5">
             <Clock className="h-3.5 w-3.5" />Timeline
           </TabsTrigger>
@@ -964,6 +1074,136 @@ export default function CandidateDetail() {
           </TabsContent>
         )}
 
+        {/* ── Resumes ───────────────────────────────────────────────────── */}
+        <TabsContent value="resumes" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Resume Versions
+              </CardTitle>
+              {canManageResumes && !uploadingNew && (
+                <Button size="sm" variant="outline" onClick={() => setUploadingNew(true)}>
+                  <Upload className="h-3.5 w-3.5 mr-1.5" /> Upload New Version
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Upload new version form */}
+              {uploadingNew && (
+                <div className="border border-dashed border-border rounded-lg p-4 space-y-3 bg-secondary/30">
+                  <p className="text-xs font-medium text-muted-foreground">Upload New Resume Version</p>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-input file:text-xs file:bg-background file:text-foreground cursor-pointer"
+                    onChange={(e) => setNewResumeFile(e.target.files?.[0] || null)}
+                  />
+                  <input
+                    type="text"
+                    placeholder="Notes (optional)"
+                    value={newResumeNotes}
+                    onChange={(e) => setNewResumeNotes(e.target.value)}
+                    className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleUploadNew} disabled={!newResumeFile || newResumeSaving}>
+                      {newResumeSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Upload className="h-3.5 w-3.5 mr-1" />}
+                      Upload
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => { setUploadingNew(false); setNewResumeFile(null); setNewResumeNotes(""); }}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Resume list */}
+              {resumesLoading ? (
+                <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+              ) : resumes.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No resume versions uploaded yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {resumes.map((rv) => (
+                    <div key={rv.id} className={`rounded-lg border p-4 space-y-2 ${rv.is_current ? "border-primary/40 bg-primary/5" : "border-border"}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm font-medium truncate">{rv.file_name}</span>
+                          {rv.is_current && (
+                            <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">Current</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <a href={rv.file_url} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                              <Download className="h-3.5 w-3.5 mr-1" /> Download
+                            </Button>
+                          </a>
+                          {canManageResumes && (
+                            <>
+                              <Button
+                                size="sm" variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => { setReplaceResumeId(rv.id); setReplaceFile(null); setReplaceNotes(""); }}
+                              >
+                                <Upload className="h-3.5 w-3.5 mr-1" /> Replace
+                              </Button>
+                              <Button
+                                size="sm" variant="ghost"
+                                className="h-7 px-2 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setConfirmDeleteResumeId(rv.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5">
+                        <span>Uploaded by {rv.uploaded_by_name || "Unknown"} ({rv.uploaded_by_code})</span>
+                        <span>{fmt(rv.created_at)}</span>
+                      </div>
+
+                      {rv.notes && (
+                        <p className="text-xs text-muted-foreground bg-secondary/50 rounded px-2.5 py-1.5">{rv.notes}</p>
+                      )}
+
+                      {/* Inline replace form */}
+                      {replaceResumeId === rv.id && (
+                        <div className="border-t border-border pt-3 mt-3 space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">Replace with new file</p>
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx"
+                            className="block w-full text-sm text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-input file:text-xs file:bg-background file:text-foreground cursor-pointer"
+                            onChange={(e) => setReplaceFile(e.target.files?.[0] || null)}
+                          />
+                          <input
+                            type="text"
+                            placeholder="Notes about changes (optional)"
+                            value={replaceNotes}
+                            onChange={(e) => setReplaceNotes(e.target.value)}
+                            className="w-full border border-input rounded-md px-3 py-2 text-sm bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          />
+                          <div className="flex gap-2">
+                            <Button size="sm" onClick={handleReplaceResume} disabled={!replaceFile || replaceSaving}>
+                              {replaceSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+                              Confirm Replace
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setReplaceResumeId(null); setReplaceFile(null); }}>Cancel</Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* ── Timeline / Activity ───────────────────────────────────────── */}
         <TabsContent value="timeline" className="mt-4 space-y-4">
           <Card>
@@ -1060,6 +1300,28 @@ export default function CandidateDetail() {
           </Button>
         </div>
       )}
+
+      {/* ── Resume delete confirmation ─────────────────────────────────────── */}
+      <AlertDialog open={!!confirmDeleteResumeId} onOpenChange={(o) => { if (!o) setConfirmDeleteResumeId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Resume Version</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this resume version. If it was the current version, the previous one will become current.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!deletingResumeId}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); if (confirmDeleteResumeId) void handleDeleteResume(confirmDeleteResumeId); }}
+              disabled={!!deletingResumeId}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingResumeId ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting...</> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Delete confirmation dialog ─────────────────────────────────────── */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

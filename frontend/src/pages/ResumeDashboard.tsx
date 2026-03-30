@@ -48,6 +48,11 @@ interface ResumeVersion {
   uploaded_by_name?: string | null;
 }
 
+interface EmployeeOption {
+  id: string;
+  full_name: string;
+}
+
 const STATUS_OPTIONS = [
   { value: "pending", label: "Queued", color: "bg-warning/10 text-warning border-warning/20" },
   { value: "in_progress", label: "In Progress", color: "bg-info/10 text-info border-info/20" },
@@ -72,11 +77,13 @@ export default function ResumeDashboard() {
   const [comments, setComments] = useState<Record<string, TaskComment[]>>({});
   const [resumeLogs, setResumeLogs] = useState<Record<string, ResumeVersion[]>>({});
   const [resumeNotes, setResumeNotes] = useState<Record<string, string>>({});
-  const [newComment, setNewComment] = useState("");
+  const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [submittingComment, setSubmittingComment] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [loadingResumeLogsFor, setLoadingResumeLogsFor] = useState<string | null>(null);
   const [uploadingResumeFor, setUploadingResumeFor] = useState<string | null>(null);
+  const [deptEmployees, setDeptEmployees] = useState<EmployeeOption[]>([]);
+  const [assigningTaskId, setAssigningTaskId] = useState<string | null>(null);
 
   const fetchTasks = useCallback(async () => {
     const response = await api.get<ResumeTask[]>("/api/support-tasks?limit=100");
@@ -110,6 +117,16 @@ export default function ResumeDashboard() {
     if (!employee) return;
     void fetchTasks();
   }, [employee, fetchTasks]);
+
+  useEffect(() => {
+    if (!employee || employee.role !== "resume_head") return;
+
+    api.get<EmployeeOption[]>(`/api/employees?department_id=${employee.department_id}&is_active=true`)
+      .then((response) => {
+        setDeptEmployees((response.data ?? []).filter((member) => member.id !== employee.id));
+      })
+      .catch(() => {});
+  }, [employee]);
 
   const fetchComments = async (taskId: string) => {
     const response = await api.get<any>(`/api/support-tasks/${taskId}`);
@@ -152,11 +169,12 @@ export default function ResumeDashboard() {
   };
 
   const addComment = async (taskId: string) => {
-    if (!employee || !newComment.trim()) return;
+    const content = commentDrafts[taskId]?.trim();
+    if (!employee || !content) return;
     setSubmittingComment(true);
     try {
-      await api.post(`/api/support-tasks/${taskId}/comments`, { content: newComment.trim() });
-      setNewComment("");
+      await api.post(`/api/support-tasks/${taskId}/comments`, { content });
+      setCommentDrafts((current) => ({ ...current, [taskId]: "" }));
       await fetchComments(taskId);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -196,12 +214,26 @@ export default function ResumeDashboard() {
       if (!response.ok || !json.success) throw new Error(json.error || "Upload failed");
 
       setResumeNotes((current) => ({ ...current, [task.id]: "" }));
-      await Promise.all([fetchResumeLogs(task), fetchTasks()]);
-      toast({ title: "Resume uploaded", description: "The latest resume version is now linked to this candidate." });
+      await Promise.all([fetchResumeLogs(task), fetchComments(task.id), fetchTasks()]);
+      toast({ title: "Resume uploaded", description: "The latest resume version is linked and the task has been completed." });
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
     } finally {
       setUploadingResumeFor(null);
+    }
+  };
+
+  const assignTask = async (taskId: string, assigneeId: string) => {
+    if (!assigneeId) return;
+    setAssigningTaskId(taskId);
+    try {
+      await api.patch(`/api/support-tasks/${taskId}/reassign`, { assigned_to_employee_id: assigneeId });
+      await fetchTasks();
+      toast({ title: "Task assigned", description: "The task is now visible in that team member's queue." });
+    } catch (err: any) {
+      toast({ title: "Assignment failed", description: err.message, variant: "destructive" });
+    } finally {
+      setAssigningTaskId(null);
     }
   };
 
@@ -305,6 +337,30 @@ export default function ResumeDashboard() {
                         </div>
                       </div>
 
+                      {employee?.role === "resume_head" && deptEmployees.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-3 border-t border-border bg-secondary/10 px-4 py-3 text-sm">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Assign To Team Member</span>
+                          <select
+                            defaultValue=""
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => {
+                              const assigneeId = e.target.value;
+                              if (!assigneeId) return;
+                              void assignTask(task.id, assigneeId);
+                              e.currentTarget.value = "";
+                            }}
+                            disabled={assigningTaskId === task.id}
+                            className="rounded border border-input bg-background px-3 py-1.5 text-xs text-foreground"
+                          >
+                            <option value="">Choose team member</option>
+                            {deptEmployees.map((member) => (
+                              <option key={member.id} value={member.id}>{member.full_name}</option>
+                            ))}
+                          </select>
+                          {assigningTaskId === task.id && <span className="text-xs text-muted-foreground"><Loader2 className="mr-1 inline h-3 w-3 animate-spin" />Assigning...</span>}
+                        </div>
+                      )}
+
                       {task.notes && <div className="border-t border-border bg-secondary/10 px-4 py-2 text-sm text-muted-foreground"><span className="text-xs font-medium text-foreground">Notes: </span>{task.notes}</div>}
 
                       {task.candidate_enrollment_id && (
@@ -365,8 +421,8 @@ export default function ResumeDashboard() {
                           ))}
                         </div>
                         <div className="flex gap-2 border-t border-border pt-2" onClick={(e) => e.stopPropagation()}>
-                          <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Add a comment visible to all departments..." className="min-h-[36px] resize-none text-sm" rows={1} maxLength={2000} />
-                          <Button size="sm" onClick={() => void addComment(task.id)} disabled={submittingComment || !newComment.trim()} className="flex-shrink-0">
+                          <Textarea value={commentDrafts[task.id] ?? ""} onChange={(e) => setCommentDrafts((current) => ({ ...current, [task.id]: e.target.value }))} placeholder="Add a comment visible to all departments..." className="min-h-[36px] resize-none text-sm" rows={1} maxLength={2000} />
+                          <Button size="sm" onClick={() => void addComment(task.id)} disabled={submittingComment || !(commentDrafts[task.id] ?? "").trim()} className="flex-shrink-0">
                             <Send className="h-3.5 w-3.5" />
                           </Button>
                         </div>

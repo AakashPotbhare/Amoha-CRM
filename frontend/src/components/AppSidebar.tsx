@@ -52,7 +52,7 @@ export default function AppSidebar({ onClose }: AppSidebarProps) {
   const { employee, signOut } = useAuth();
   const access = useEmployeeAccess();
   const role = employee?.role ?? "";
-  const showEnrollCandidate = ["director", "hr_head", "sales_head", "assistant_tl", "sales_executive"].includes(role);
+  const showEnrollCandidate = ["sales_head", "assistant_tl", "sales_executive", "lead_generator"].includes(role);
   const showCandidateBoard = !!access?.hasPermission("candidates.read");
   const showSupportTaskCreator = ["director", "hr_head", "sales_head", "assistant_tl", "sales_executive", "lead_generator", "marketing_tl", "recruiter", "senior_recruiter", "resume_head", "resume_builder", "compliance_officer"].includes(role);
 
@@ -112,12 +112,9 @@ export default function AppSidebar({ onClose }: AppSidebarProps) {
   // My Performance — visible to all employees
   actionItems.push({ to: "/my-performance", icon: TrendingUp, label: "My Performance" });
 
-  // Placement Offers — leadership, team leads, compliance
-  if (employee) {
-    const poRoles = ["director","ops_head","hr_head","marketing_tl","sales_head","technical_head","resume_head","compliance_officer"];
-    if (poRoles.includes(employee.role)) {
-      actionItems.push({ to: "/placement-orders", icon: BadgeDollarSign, label: "Placement Offers" });
-    }
+  // Placement Offers — only Marketing TL quick action
+  if (employee?.role === "marketing_tl") {
+    actionItems.push({ to: "/placement-orders", icon: BadgeDollarSign, label: "Placement Offers" });
   }
 
   // ─── Render helper ───────────────────────────────────────────────────────

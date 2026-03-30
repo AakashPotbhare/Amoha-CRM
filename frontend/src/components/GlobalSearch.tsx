@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback, KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, Users, UserCheck, Briefcase, ClipboardList } from "lucide-react";
 import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
 import { api } from "@/lib/api.client";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,6 @@ interface CandidateResult {
   current_domain: string | null;
   visa_status: string | null;
   pipeline_stage: string | null;
-  marketing_status: string | null;
 }
 
 interface EmployeeResult {
@@ -94,6 +94,7 @@ interface GlobalSearchProps {
 
 export default function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const navigate = useNavigate();
+  const { employee } = useAuth();
 
   const [query, setQuery] = useState("");
   const [data, setData] = useState<SearchData | null>(null);
@@ -149,12 +150,22 @@ export default function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) 
   // Navigate to result
   const flat = buildFlat(data);
 
+  const canViewHR = employee &&
+    ["director", "ops_head", "hr_head"].includes(employee.role);
+
   function selectResult(result: FlatResult) {
     onOpenChange(false);
     if (result.kind === "candidate") {
       navigate(`/candidates/${result.item.id}`);
     } else {
-      navigate("/hr");
+      // Navigate to team directory or the user's own profile
+      if (canViewHR) {
+        navigate("/hr");
+      } else if (employee && result.item.id === employee.id) {
+        navigate("/profile");
+      } else {
+        navigate("/hr");
+      }
     }
   }
 
@@ -226,9 +237,52 @@ export default function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) 
 
           {/* Idle state — no query yet */}
           {!loading && query.trim().length < 2 && !error && (
-            <p className="px-4 py-8 text-sm text-center text-muted-foreground">
-              Type at least 2 characters to search
-            </p>
+            <div className="px-4 py-4">
+              <p className="text-xs text-muted-foreground mb-3 font-medium uppercase tracking-wider">
+                You can search for
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                  <UserCheck className="w-4 h-4 mt-0.5 text-blue-500 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Candidates</p>
+                    <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                      Name, email, phone, domain, visa type
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                  <Users className="w-4 h-4 mt-0.5 text-purple-500 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Employees</p>
+                    <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                      Name, employee code, designation
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                  <Briefcase className="w-4 h-4 mt-0.5 text-green-500 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Pipeline stages</p>
+                    <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                      enrolled, placed, rejected, interview…
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                  <ClipboardList className="w-4 h-4 mt-0.5 text-orange-500 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Marketing name</p>
+                    <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                      Candidate marketing alias or brand
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-3 text-center">
+                Type at least 2 characters to start searching
+              </p>
+            </div>
           )}
 
           {/* Candidate results */}

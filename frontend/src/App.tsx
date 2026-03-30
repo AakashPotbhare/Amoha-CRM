@@ -143,7 +143,7 @@ const App = () => (
                         element={
                           <ProtectedRoute
                             requiredPermission="support_tasks.write"
-                            allowedRoles={["director", "hr_head", "sales_head", "assistant_tl", "sales_executive", "lead_generator", "marketing_tl", "recruiter", "senior_recruiter", "resume_head", "resume_builder", "compliance_officer"]}
+                            allowedRoles={["director", "ops_head", "hr_head", "sales_head", "assistant_tl", "sales_executive", "lead_generator", "marketing_tl", "recruiter", "senior_recruiter", "resume_head", "resume_builder", "compliance_officer"]}
                           >
                             <CreateSupportTask />
                           </ProtectedRoute>
@@ -156,7 +156,7 @@ const App = () => (
                         element={
                           <ProtectedRoute
                             requiredPermission="candidates.enroll"
-                            allowedRoles={["director", "hr_head", "sales_head", "assistant_tl", "sales_executive"]}
+                            allowedRoles={["director", "hr_head", "sales_head", "assistant_tl", "sales_executive", "lead_generator"]}
                           >
                             <CandidateEnrollment />
                           </ProtectedRoute>
@@ -225,8 +225,8 @@ const App = () => (
                       <Route path="/profile" element={<Profile />} />
 
                       {/* Placement Offers */}
-                      <Route path="/placement-orders" element={<PlacementOffers />} />
-                      <Route path="/placement-orders/create" element={<CreatePlacementOffer />} />
+                      <Route path="/placement-orders" element={<ProtectedRoute allowedRoles={["marketing_tl"]}><PlacementOffers /></ProtectedRoute>} />
+                      <Route path="/placement-orders/create" element={<ProtectedRoute allowedRoles={["marketing_tl"]}><CreatePlacementOffer /></ProtectedRoute>} />
 
                       {/* My Performance */}
                       <Route path="/my-performance" element={<MyPerformance />} />

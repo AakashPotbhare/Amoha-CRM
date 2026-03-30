@@ -8,6 +8,8 @@ export default function Home() {
   const navigate = useNavigate();
   const { employee } = useAuth();
   const access = useEmployeeAccess();
+  const role = employee?.role ?? "";
+  const showEnrollCandidate = ["sales_head", "assistant_tl", "sales_executive", "lead_generator"].includes(role);
 
   const dashboardRoute = access?.getDashboardRoute() || "/dashboard";
 
@@ -40,7 +42,7 @@ export default function Home() {
       to: "/profile",
       gradient: "from-muted-foreground to-foreground",
     },
-    ...(access?.departmentSlug === "sales" || access?.canViewAllDepartments
+    ...(showEnrollCandidate
       ? [
           {
             title: "Enroll Candidate",

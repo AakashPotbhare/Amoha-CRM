@@ -64,7 +64,7 @@ const ROLE_PERMISSIONS: Record<EmployeeRole, Permission[]> = {
     'candidates.read', 'candidates.write', 'candidates.enroll',
     'departments.own',
     'tasks.read', 'tasks.write',
-    'support_tasks.read',
+    'support_tasks.read', 'support_tasks.write',
     'dashboard.department',
     'attendance.read_own',
     'leaves.submit', 'leaves.approve_tl',
@@ -111,7 +111,7 @@ const ROLE_PERMISSIONS: Record<EmployeeRole, Permission[]> = {
   assistant_tl: [
     'candidates.read', 'candidates.enroll',
     'tasks.read', 'tasks.write',
-    'support_tasks.read',
+    'support_tasks.read', 'support_tasks.write',
     'attendance.read_own',
     'leaves.submit', 'leaves.approve_tl',
   ],
@@ -119,13 +119,15 @@ const ROLE_PERMISSIONS: Record<EmployeeRole, Permission[]> = {
   sales_executive: [
     'candidates.enroll', 'candidates.read',
     'tasks.read_own', 'tasks.write',
+    'support_tasks.write',
     'attendance.read_own',
     'leaves.submit',
   ],
 
   lead_generator: [
-    'candidates.read',
+    'candidates.read', 'candidates.enroll',
     'tasks.read_own', 'tasks.write',
+    'support_tasks.write',
     'attendance.read_own',
     'leaves.submit',
   ],
@@ -141,6 +143,7 @@ const ROLE_PERMISSIONS: Record<EmployeeRole, Permission[]> = {
   senior_recruiter: [
     'support_tasks.read_own', 'support_tasks.write',
     'tasks.read_own', 'tasks.write',
+    'candidates.read',
     'attendance.read_own',
     'leaves.submit',
   ],
@@ -148,6 +151,7 @@ const ROLE_PERMISSIONS: Record<EmployeeRole, Permission[]> = {
   recruiter: [
     'support_tasks.read_own', 'support_tasks.write',
     'tasks.read_own', 'tasks.write',
+    'candidates.read',
     'attendance.read_own',
     'leaves.submit',
   ],
@@ -155,6 +159,7 @@ const ROLE_PERMISSIONS: Record<EmployeeRole, Permission[]> = {
   resume_builder: [
     'support_tasks.read_own', 'support_tasks.write',
     'tasks.read_own', 'tasks.write',
+    'candidates.read',
     'attendance.read_own',
     'leaves.submit',
   ],
